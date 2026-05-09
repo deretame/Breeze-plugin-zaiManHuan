@@ -1,5 +1,5 @@
-import { resolve } from "node:path";
-import type { Configuration } from "@rspack/core";
+import { resolve } from 'node:path';
+import type { Configuration } from '@rspack/core';
 
 export type CreateRspackConfigOptions = {
   rootDir: string;
@@ -13,45 +13,45 @@ export function createRspackConfig({
   outFileName,
 }: CreateRspackConfigOptions): Configuration {
   return {
-    mode: "production",
+    mode: 'production',
     entry: `${rootDir}/src/index.ts`,
-    target: "web",
+    target: 'web',
     devtool: false,
     module: {
       rules: [
         {
           test: /\.tsx?$/,
           exclude: /node_modules/,
-          enforce: "pre",
+          enforce: 'pre',
           use: [
             {
-              loader: resolve(rootDir, "build/console-location-loader.cjs"),
+              loader: resolve(rootDir, 'build/console-location-loader.cjs'),
             },
           ],
         },
         {
           test: /\.tsx?$/,
           exclude: /node_modules/,
-          loader: "builtin:swc-loader",
+          loader: 'builtin:swc-loader',
           options: {
             jsc: {
               parser: {
-                syntax: "typescript",
+                syntax: 'typescript',
               },
-              target: "es2019",
+              target: 'es2019',
             },
           },
         },
       ],
     },
     resolve: {
-      extensions: [".ts", ".tsx", ".mjs", ".js", ".json"],
+      extensions: ['.ts', '.tsx', '.mjs', '.js', '.json'],
     },
     output: {
       path: outPath,
       filename: outFileName,
       library: {
-        type: "commonjs2",
+        type: 'commonjs2',
       },
     },
     optimization: {

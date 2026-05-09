@@ -5,7 +5,7 @@ import type {
   NativeApi,
   PathApi,
   WasiApi,
-} from "../types/runtime-globals";
+} from '../types/runtime-globals';
 
 export interface RuntimeApiSet {
   Headers: typeof Headers;
@@ -39,35 +39,29 @@ export type RuntimeApiName = keyof RuntimeApiSet;
 type RuntimeGlobal = typeof globalThis & Partial<RuntimeApiSet>;
 
 function isCryptoApi(value: unknown): value is CryptoApi {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== 'object') return false;
   const candidate = value as {
     createHash?: unknown;
     createHmac?: unknown;
     randomBytes?: unknown;
   };
   return (
-    typeof candidate.createHash === "function" &&
-    typeof candidate.createHmac === "function" &&
-    typeof candidate.randomBytes === "function"
+    typeof candidate.createHash === 'function' &&
+    typeof candidate.createHmac === 'function' &&
+    typeof candidate.randomBytes === 'function'
   );
 }
 
-function readGlobal<K extends RuntimeApiName>(
-  name: K,
-): RuntimeApiSet[K] | undefined {
+function readGlobal<K extends RuntimeApiName>(name: K): RuntimeApiSet[K] | undefined {
   const g = globalThis as RuntimeGlobal;
   return g[name] as RuntimeApiSet[K] | undefined;
 }
 
-export function getApi<K extends RuntimeApiName>(
-  name: K,
-): RuntimeApiSet[K] | undefined {
+export function getApi<K extends RuntimeApiName>(name: K): RuntimeApiSet[K] | undefined {
   return readGlobal(name);
 }
 
-export function requireApi<K extends RuntimeApiName>(
-  name: K,
-): RuntimeApiSet[K] {
+export function requireApi<K extends RuntimeApiName>(name: K): RuntimeApiSet[K] {
   const value = readGlobal(name);
   if (value === undefined || value === null) {
     throw new TypeError(`runtime API 不可用: ${String(name)}`);
@@ -76,10 +70,10 @@ export function requireApi<K extends RuntimeApiName>(
 }
 
 export function getCryptoLike(): CryptoApi | undefined {
-  const direct = getApi("crypto");
+  const direct = getApi('crypto');
   if (isCryptoApi(direct)) return direct;
 
-  const compat = getApi("nodeCryptoCompat");
+  const compat = getApi('nodeCryptoCompat');
   if (isCryptoApi(compat)) return compat;
 
   return undefined;
@@ -88,108 +82,108 @@ export function getCryptoLike(): CryptoApi | undefined {
 export function requireCryptoLike(): CryptoApi {
   const value = getCryptoLike();
   if (!value) {
-    throw new TypeError("runtime API 不可用: crypto/nodeCryptoCompat");
+    throw new TypeError('runtime API 不可用: crypto/nodeCryptoCompat');
   }
   return value;
 }
 
 export function getRuntimeApis(): Partial<RuntimeApiSet> {
   return {
-    Headers: getApi("Headers"),
-    AbortController: getApi("AbortController"),
-    AbortSignal: getApi("AbortSignal"),
-    Request: getApi("Request"),
-    Response: getApi("Response"),
-    fetch: getApi("fetch"),
-    fs: getApi("fs"),
-    FSError: getApi("FSError"),
-    native: getApi("native"),
-    wasi: getApi("wasi"),
-    bridge: getApi("bridge"),
-    path: getApi("path"),
-    URL: getApi("URL"),
-    URLSearchParams: getApi("URLSearchParams"),
-    Blob: getApi("Blob"),
-    File: getApi("File"),
-    FormData: getApi("FormData"),
-    crypto: getApi("crypto"),
-    nodeCryptoCompat: getApi("nodeCryptoCompat"),
-    uuidv4: getApi("uuidv4"),
-    TextEncoder: getApi("TextEncoder"),
-    TextDecoder: getApi("TextDecoder"),
-    Buffer: getApi("Buffer"),
-    console: getApi("console"),
+    Headers: getApi('Headers'),
+    AbortController: getApi('AbortController'),
+    AbortSignal: getApi('AbortSignal'),
+    Request: getApi('Request'),
+    Response: getApi('Response'),
+    fetch: getApi('fetch'),
+    fs: getApi('fs'),
+    FSError: getApi('FSError'),
+    native: getApi('native'),
+    wasi: getApi('wasi'),
+    bridge: getApi('bridge'),
+    path: getApi('path'),
+    URL: getApi('URL'),
+    URLSearchParams: getApi('URLSearchParams'),
+    Blob: getApi('Blob'),
+    File: getApi('File'),
+    FormData: getApi('FormData'),
+    crypto: getApi('crypto'),
+    nodeCryptoCompat: getApi('nodeCryptoCompat'),
+    uuidv4: getApi('uuidv4'),
+    TextEncoder: getApi('TextEncoder'),
+    TextDecoder: getApi('TextDecoder'),
+    Buffer: getApi('Buffer'),
+    console: getApi('console'),
   };
 }
 
 export const runtime = {
   get Headers() {
-    return requireApi("Headers");
+    return requireApi('Headers');
   },
   get AbortController() {
-    return requireApi("AbortController");
+    return requireApi('AbortController');
   },
   get AbortSignal() {
-    return requireApi("AbortSignal");
+    return requireApi('AbortSignal');
   },
   get Request() {
-    return requireApi("Request");
+    return requireApi('Request');
   },
   get Response() {
-    return requireApi("Response");
+    return requireApi('Response');
   },
   get fetch() {
-    return requireApi("fetch");
+    return requireApi('fetch');
   },
   get fs() {
-    return requireApi("fs");
+    return requireApi('fs');
   },
   get FSError() {
-    return requireApi("FSError");
+    return requireApi('FSError');
   },
   get native() {
-    return requireApi("native");
+    return requireApi('native');
   },
   get wasi() {
-    return requireApi("wasi");
+    return requireApi('wasi');
   },
   get bridge() {
-    return requireApi("bridge");
+    return requireApi('bridge');
   },
   get path() {
-    return requireApi("path");
+    return requireApi('path');
   },
   get URL() {
-    return requireApi("URL");
+    return requireApi('URL');
   },
   get URLSearchParams() {
-    return requireApi("URLSearchParams");
+    return requireApi('URLSearchParams');
   },
   get Blob() {
-    return requireApi("Blob");
+    return requireApi('Blob');
   },
   get File() {
-    return requireApi("File");
+    return requireApi('File');
   },
   get FormData() {
-    return requireApi("FormData");
+    return requireApi('FormData');
   },
   get crypto() {
     return requireCryptoLike();
   },
   get uuidv4() {
-    return requireApi("uuidv4");
+    return requireApi('uuidv4');
   },
   get TextEncoder() {
-    return requireApi("TextEncoder");
+    return requireApi('TextEncoder');
   },
   get TextDecoder() {
-    return requireApi("TextDecoder");
+    return requireApi('TextDecoder');
   },
   get Buffer() {
-    return requireApi("Buffer");
+    return requireApi('Buffer');
   },
   get console() {
-    return requireApi("console");
+    return requireApi('console');
   },
 };

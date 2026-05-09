@@ -1,15 +1,13 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { promisify } from "node:util";
-import { brotliCompress, constants as zlibConstants } from "node:zlib";
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { promisify } from 'node:util';
+import { brotliCompress, constants as zlibConstants } from 'node:zlib';
 
 const brotliCompressAsync = promisify(brotliCompress);
 
 async function main() {
-  const distDir = resolve(process.cwd(), "dist");
-  const files = (await readdir(distDir)).filter((file) =>
-    file.endsWith(".bundle.cjs"),
-  );
+  const distDir = resolve(process.cwd(), 'dist');
+  const files = (await readdir(distDir)).filter((file) => file.endsWith('.bundle.cjs'));
 
   if (files.length === 0) {
     throw new Error(`[brotli] no .bundle.cjs file found in ${distDir}`);
@@ -31,6 +29,6 @@ async function main() {
 }
 
 void main().catch((error) => {
-  console.error("[brotli] generate failed:", error);
+  console.error('[brotli] generate failed:', error);
   process.exit(1);
 });
