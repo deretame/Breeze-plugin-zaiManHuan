@@ -410,10 +410,6 @@ async function loginWithPassword(payload: LoginPayload = {}) {
       ]);
     }
     await saveAuthToken(token);
-    flutterTools.showToast({
-      message: '登录成功',
-      level: 'success',
-    });
     return token;
   })();
 
@@ -480,6 +476,10 @@ async function setAccountAndLogin(payload: Record<string, unknown> = {}) {
     reason: 'settings.account.changed',
     persistCredentials: true,
   });
+  flutterTools.showToast({
+    message: '登录成功',
+    level: 'success',
+  });
   return {
     source: PLUGIN_ID,
     data: {
@@ -498,6 +498,10 @@ async function setPasswordAndLogin(payload: Record<string, unknown> = {}) {
     password,
     reason: 'settings.password.changed',
     persistCredentials: true,
+  });
+  flutterTools.showToast({
+    message: '登录成功',
+    level: 'success',
   });
   return {
     source: PLUGIN_ID,
