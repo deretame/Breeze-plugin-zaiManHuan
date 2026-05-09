@@ -1,4 +1,4 @@
-import { runtime } from "../types/runtime-api";
+import wretch from 'wretch';
 import {
   NOT_FOUND_IMAGE_URL,
   PLUGIN_ID,
@@ -7,9 +7,9 @@ import {
   createImage,
   createMetadataActionList,
   toStringMap,
-} from "./common";
-import { buildPluginInfo } from "./get-info";
-import { pluginConfig } from "./tools";
+} from './common';
+import { buildPluginInfo } from './get-info';
+import { flutterTools, pluginConfig } from './tools';
 
 type BasePayload = {
   extern?: Record<string, unknown>;
@@ -124,17 +124,17 @@ type ChapterApiData = {
   data?: ChapterApiInfo;
 };
 
-const API_BASE = "https://v4api.zaimanhua.com/app/v1";
-const APP_VERSION = "2.3.4";
-const APP_CHANNEL = "101_01_01_000";
-const USER_AGENT_CONFIG_KEY = "network.userAgent";
-const AUTH_ACCOUNT_CONFIG_KEY = "auth.account";
-const AUTH_PASSWORD_CONFIG_KEY = "auth.password";
-const AUTH_TOKEN_CONFIG_KEY = "auth.token";
+const API_BASE = 'https://v4api.zaimanhua.com/app/v1';
+const APP_VERSION = '2.3.4';
+const APP_CHANNEL = '101_01_01_000';
+const USER_AGENT_CONFIG_KEY = 'network.userAgent';
+const AUTH_ACCOUNT_CONFIG_KEY = 'auth.account';
+const AUTH_PASSWORD_CONFIG_KEY = 'auth.password';
+const AUTH_TOKEN_CONFIG_KEY = 'auth.token';
 const AUTH_CREDENTIALS_REQUIRED_ERROR =
-  "[AUTH_CREDENTIALS_REQUIRED] 账号或密码不能为空，请先在设置中填写";
+  '[AUTH_CREDENTIALS_REQUIRED] 账号或密码不能为空，请先在设置中填写';
 const AUTH_PERMISSION_INSUFFICIENT_ERROR =
-  "权限不足，请前往app中提升权限等级（如绑定手机号）";
+  '权限不足，请前往快漫画官方app中提升权限等级（如绑定手机号）';
 
 let userAgentCache: string | null = null;
 let userAgentInitPromise: Promise<string> | null = null;
@@ -152,8 +152,8 @@ function pickOne<T>(values: readonly T[]): T {
 }
 
 function randomToken(length = 6) {
-  const source = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
+  const source = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
   for (let i = 0; i < length; i += 1) {
     result += source[randomInt(0, source.length - 1)];
   }
@@ -163,29 +163,29 @@ function randomToken(length = 6) {
 function randomAndroidDevice() {
   const profile = pickOne([
     {
-      brand: "Xiaomi",
-      modelPrefix: "230",
-      modelSuffixes: ["1C", "1A", "2B", "3D", "3G", "4R"],
+      brand: 'Xiaomi',
+      modelPrefix: '230',
+      modelSuffixes: ['1C', '1A', '2B', '3D', '3G', '4R'],
     },
     {
-      brand: "samsung",
-      modelPrefix: "SM-",
-      modelSuffixes: ["S9180", "S9260", "A5560", "A7360", "S9210"],
+      brand: 'samsung',
+      modelPrefix: 'SM-',
+      modelSuffixes: ['S9180', 'S9260', 'A5560', 'A7360', 'S9210'],
     },
     {
-      brand: "OnePlus",
-      modelPrefix: "CPH",
-      modelSuffixes: ["2581", "2609", "2451", "2449", "2493"],
+      brand: 'OnePlus',
+      modelPrefix: 'CPH',
+      modelSuffixes: ['2581', '2609', '2451', '2449', '2493'],
     },
     {
-      brand: "vivo",
-      modelPrefix: "V",
-      modelSuffixes: ["2337A", "2366A", "2358A", "2318A", "2407A"],
+      brand: 'vivo',
+      modelPrefix: 'V',
+      modelSuffixes: ['2337A', '2366A', '2358A', '2318A', '2407A'],
     },
     {
-      brand: "HUAWEI",
-      modelPrefix: "NOH-",
-      modelSuffixes: ["AN00", "AL10", "NX9", "LX9", "TL00"],
+      brand: 'HUAWEI',
+      modelPrefix: 'NOH-',
+      modelSuffixes: ['AN00', 'AL10', 'NX9', 'LX9', 'TL00'],
     },
   ] as const);
 
@@ -193,16 +193,16 @@ function randomAndroidDevice() {
 }
 
 function buildRandomUserAgent() {
-  const androidVersion = pickOne(["10", "11", "12", "13", "14", "15"] as const);
+  const androidVersion = pickOne(['10', '11', '12', '13', '14', '15'] as const);
   const device = randomAndroidDevice();
   const webKitVersion = `537.${randomInt(30, 38)}`;
   const chromeMajor = randomInt(108, 136);
   const chromeBuildA = randomInt(0, 9);
   const chromeBuildB = randomInt(1000, 6999);
   const chromeBuildC = randomInt(50, 199);
-  const buildId = `${pickOne(["QP1A", "SP1A", "TP1A", "UP1A", "AP1A"] as const)}.${randomInt(200000, 999999)}.${randomInt(1, 99)}`;
+  const buildId = `${pickOne(['QP1A', 'SP1A', 'TP1A', 'UP1A', 'AP1A'] as const)}.${randomInt(200000, 999999)}.${randomInt(1, 99)}`;
   const optionalTail = pickOne([
-    "",
+    '',
     `; wv`,
     `; ${randomToken(2)}-${randomToken(2)}`,
     `; zh-cn`,
@@ -221,9 +221,7 @@ async function getPersistedUserAgent() {
 
   userAgentInitPromise = (async () => {
     try {
-      const saved = String(
-        await pluginConfig.load(USER_AGENT_CONFIG_KEY, ""),
-      ).trim();
+      const saved = String(await pluginConfig.load(USER_AGENT_CONFIG_KEY, '')).trim();
       if (saved) {
         userAgentCache = saved;
         return saved;
@@ -249,14 +247,14 @@ async function getPersistedUserAgent() {
   }
 }
 
-function decodeConfigString(raw: unknown, fallback = "") {
+function decodeConfigString(raw: unknown, fallback = '') {
   if (raw === undefined || raw === null) {
     return fallback;
   }
 
-  if (typeof raw === "object") {
+  if (typeof raw === 'object') {
     const map = raw as Record<string, unknown>;
-    if (map.ok === true && "value" in map) {
+    if (map.ok === true && 'value' in map) {
       return decodeConfigString(map.value, fallback);
     }
     return fallback;
@@ -271,20 +269,13 @@ function decodeConfigString(raw: unknown, fallback = "") {
     const parsed = JSON.parse(text.trim());
     if (
       parsed &&
-      typeof parsed === "object" &&
+      typeof parsed === 'object' &&
       (parsed as Record<string, unknown>).ok === true &&
-      "value" in (parsed as Record<string, unknown>)
+      'value' in (parsed as Record<string, unknown>)
     ) {
-      return decodeConfigString(
-        (parsed as Record<string, unknown>).value,
-        fallback,
-      );
+      return decodeConfigString((parsed as Record<string, unknown>).value, fallback);
     }
-    if (
-      typeof parsed === "string" ||
-      typeof parsed === "number" ||
-      typeof parsed === "boolean"
-    ) {
+    if (typeof parsed === 'string' || typeof parsed === 'number' || typeof parsed === 'boolean') {
       return String(parsed);
     }
   } catch {
@@ -293,21 +284,15 @@ function decodeConfigString(raw: unknown, fallback = "") {
   return text;
 }
 
-async function loadConfigString(key: string, fallback = "") {
-  const raw = await pluginConfig.load(key, fallback);
-  return decodeConfigString(raw, fallback);
-}
-
 async function saveConfigString(key: string, value: string) {
-  const normalized = decodeConfigString(value, "");
+  const normalized = decodeConfigString(value, '');
   await pluginConfig.save(key, normalized);
 }
 
-async function loadAndNormalizeConfigString(key: string, fallback = "") {
+async function loadAndNormalizeConfigString(key: string, fallback = '') {
   const raw = await pluginConfig.load(key, fallback);
   const normalized = decodeConfigString(raw, fallback);
-  const currentRawText =
-    typeof raw === "string" ? raw : raw == null ? "" : String(raw);
+  const currentRawText = typeof raw === 'string' ? raw : raw == null ? '' : String(raw);
   if (currentRawText !== normalized) {
     try {
       await saveConfigString(key, normalized);
@@ -319,13 +304,11 @@ async function loadAndNormalizeConfigString(key: string, fallback = "") {
 }
 
 async function loadAuthAccount() {
-  return (
-    await loadAndNormalizeConfigString(AUTH_ACCOUNT_CONFIG_KEY, "")
-  ).trim();
+  return (await loadAndNormalizeConfigString(AUTH_ACCOUNT_CONFIG_KEY, '')).trim();
 }
 
 async function loadAuthPassword() {
-  return await loadAndNormalizeConfigString(AUTH_PASSWORD_CONFIG_KEY, "");
+  return await loadAndNormalizeConfigString(AUTH_PASSWORD_CONFIG_KEY, '');
 }
 
 async function loadAuthToken() {
@@ -336,9 +319,7 @@ async function loadAuthToken() {
     return authTokenInitPromise;
   }
   authTokenInitPromise = (async () => {
-    const token = (
-      await loadAndNormalizeConfigString(AUTH_TOKEN_CONFIG_KEY, "")
-    ).trim();
+    const token = (await loadAndNormalizeConfigString(AUTH_TOKEN_CONFIG_KEY, '')).trim();
     authTokenCache = token;
     return token;
   })();
@@ -350,25 +331,25 @@ async function loadAuthToken() {
 }
 
 async function saveAuthToken(token: string) {
-  const normalized = String(token ?? "").trim();
+  const normalized = String(token ?? '').trim();
   authTokenCache = normalized;
   await saveConfigString(AUTH_TOKEN_CONFIG_KEY, normalized);
 }
 
 async function md5Hex(input: string) {
-  const hash = await bridge.call("crypto.md5_hex", input);
-  return String(hash ?? "").trim();
+  const hash = await bridge.call('crypto.md5_hex', input);
+  return String(hash ?? '').trim();
 }
 
 function requireCredentials(account: string, password: string) {
-  if (!account.trim() || !String(password ?? "").trim()) {
+  if (!account.trim() || !String(password ?? '').trim()) {
     throw new Error(AUTH_CREDENTIALS_REQUIRED_ERROR);
   }
 }
 
 async function loginWithPassword(payload: LoginPayload = {}) {
-  const account = String(payload.account ?? "").trim();
-  const password = String(payload.password ?? "");
+  const account = String(payload.account ?? '').trim();
+  const password = String(payload.password ?? '');
   requireCredentials(account, password);
 
   if (loginInFlight) {
@@ -386,34 +367,40 @@ async function loginWithPassword(payload: LoginPayload = {}) {
   loginInFlight = (async () => {
     const encryptedPwd = await md5Hex(password);
     const formData = new URLSearchParams();
-    formData.append("username", account);
-    formData.append("passwd", encryptedPwd);
+    formData.append('username', account);
+    formData.append('passwd', encryptedPwd);
 
     const headers = await getDefaultHeaders({ includeAuth: false });
-    const response = await fetch(
-      "https://account-api.zaimanhua.com/v1/login/passwd",
-      {
-        method: "POST",
-        headers: {
-          ...headers,
-          "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
-        },
-        body: formData.toString(),
-      },
-    );
+    const response = await wretch('https://account-api.zaimanhua.com/v1/login/passwd')
+      .headers({
+        ...headers,
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+      })
+      .post(formData.toString())
+      .res();
     if (!response.ok) {
+      flutterTools.showToast({
+        message: `登录请求失败(${response.status})`,
+        level: 'error',
+      });
       throw new Error(`登录请求失败(${response.status})`);
     }
-    const json = (await response.json()) as ApiResponse<
-      Record<string, unknown>
-    >;
+    const json = (await response.json()) as ApiResponse<Record<string, unknown>>;
     if (json.errno !== 0) {
-      throw new Error(json.errmsg || "登录失败");
+      flutterTools.showToast({
+        message: json.errmsg || '登录失败',
+        level: 'error',
+      });
+      throw new Error(json.errmsg || '登录失败');
     }
     const user = toStringMap(toStringMap(json.data).user);
-    const token = String(user.token ?? "").trim();
+    const token = String(user.token ?? '').trim();
     if (!token) {
-      throw new Error("登录成功但未返回 token");
+      flutterTools.showToast({
+        message: '登录成功但未返回 token',
+        level: 'error',
+      });
+      throw new Error('登录成功但未返回 token');
     }
 
     if (payload.persistCredentials !== false) {
@@ -423,6 +410,10 @@ async function loginWithPassword(payload: LoginPayload = {}) {
       ]);
     }
     await saveAuthToken(token);
+    flutterTools.showToast({
+      message: '登录成功',
+      level: 'success',
+    });
     return token;
   })();
 
@@ -441,11 +432,8 @@ async function loginWithPassword(payload: LoginPayload = {}) {
   }
 }
 
-async function loginWithStoredCredentials(reason = "unknown") {
-  const [account, password] = await Promise.all([
-    loadAuthAccount(),
-    loadAuthPassword(),
-  ]);
+async function loginWithStoredCredentials(reason = 'unknown') {
+  const [account, password] = await Promise.all([loadAuthAccount(), loadAuthPassword()]);
   try {
     return await loginWithPassword({
       account,
@@ -454,7 +442,7 @@ async function loginWithStoredCredentials(reason = "unknown") {
       persistCredentials: true,
     });
   } catch (error) {
-    console.error("[zmh.login] failed", {
+    console.error('[zmh.login] failed', {
       reason,
       hasAccount: Boolean(account),
       hasPassword: Boolean(String(password).trim()),
@@ -464,45 +452,39 @@ async function loginWithStoredCredentials(reason = "unknown") {
   }
 }
 
-function readSettingPayloadValue(
-  payload: Record<string, unknown>,
-  key: string,
-) {
+function readSettingPayloadValue(payload: Record<string, unknown>, key: string) {
   const direct = payload.value;
   if (direct !== undefined && direct !== null) {
-    return decodeConfigString(direct, "");
+    return decodeConfigString(direct, '');
   }
   if (payload[key] !== undefined && payload[key] !== null) {
-    return decodeConfigString(payload[key], "");
+    return decodeConfigString(payload[key], '');
   }
   const data = toStringMap(payload.data);
   if (data[key] !== undefined && data[key] !== null) {
-    return decodeConfigString(data[key], "");
+    return decodeConfigString(data[key], '');
   }
   if (data.value !== undefined && data.value !== null) {
-    return decodeConfigString(data.value, "");
+    return decodeConfigString(data.value, '');
   }
-  return "";
+  return '';
 }
 
 async function setAccountAndLogin(payload: Record<string, unknown> = {}) {
-  const account = readSettingPayloadValue(
-    payload,
-    AUTH_ACCOUNT_CONFIG_KEY,
-  ).trim();
+  const account = readSettingPayloadValue(payload, AUTH_ACCOUNT_CONFIG_KEY).trim();
   await saveConfigString(AUTH_ACCOUNT_CONFIG_KEY, account);
   const password = await loadAuthPassword();
   const result = await loginWithPassword({
     account,
     password,
-    reason: "settings.account.changed",
+    reason: 'settings.account.changed',
     persistCredentials: true,
   });
   return {
     source: PLUGIN_ID,
     data: {
       account,
-      jwtToken: String(toStringMap(result.data).jwtToken ?? ""),
+      jwtToken: String(toStringMap(result.data).jwtToken ?? ''),
     },
   };
 }
@@ -514,14 +496,14 @@ async function setPasswordAndLogin(payload: Record<string, unknown> = {}) {
   const result = await loginWithPassword({
     account,
     password,
-    reason: "settings.password.changed",
+    reason: 'settings.password.changed',
     persistCredentials: true,
   });
   return {
     source: PLUGIN_ID,
     data: {
       account,
-      jwtToken: String(toStringMap(result.data).jwtToken ?? ""),
+      jwtToken: String(toStringMap(result.data).jwtToken ?? ''),
     },
   };
 }
@@ -530,15 +512,15 @@ async function getDefaultHeaders(
   options: {
     includeAuth?: boolean;
     token?: string;
-  } = {},
+  } = {}
 ) {
   const userAgent = await getPersistedUserAgent();
   const headers: Record<string, string> = {
-    "User-Agent": userAgent,
-    Accept: "application/json",
+    'User-Agent': userAgent,
+    Accept: 'application/json',
   };
   if (options.includeAuth !== false) {
-    const token = String(options.token ?? "").trim() || (await loadAuthToken());
+    const token = String(options.token ?? '').trim() || (await loadAuthToken());
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -548,7 +530,7 @@ async function getDefaultHeaders(
 
 function getDefaultParams() {
   return {
-    platform: "android",
+    platform: 'android',
     timestamp: String(Math.floor(Date.now() / 1000)),
     _v: APP_VERSION,
     _c: APP_CHANNEL,
@@ -559,13 +541,13 @@ function toTagNameList(values: unknown): string[] {
   const list = Array.isArray(values) ? values : [];
   return list
     .map((item) => toStringMap(item))
-    .map((item) => String(item.tag_name ?? "").trim())
+    .map((item) => String(item.tag_name ?? '').trim())
     .filter(Boolean);
 }
 
 function splitTypeValues(value: unknown): string[] {
-  return String(value ?? "")
-    .split(/[\/,，]/g)
+  return String(value ?? '')
+    .split(/[/,，]/g)
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -573,9 +555,9 @@ function splitTypeValues(value: unknown): string[] {
 function formatUnixSeconds(value: unknown): string {
   const seconds = Number(value);
   if (!Number.isFinite(seconds) || seconds <= 0) {
-    return "";
+    return '';
   }
-  return new Date(seconds * 1000).toISOString().slice(0, 19).replace("T", " ");
+  return new Date(seconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
 }
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -597,21 +579,21 @@ function pickDetailComicId(item: SearchApiComic): string {
   if (comicId > 0) {
     return String(comicId);
   }
-  return String(item.id ?? "").trim();
+  return String(item.id ?? '').trim();
 }
 
 function mapSearchItemToComicGrid(item: SearchApiComic) {
   const comicId = pickDetailComicId(item);
-  const title = String(item.title ?? "").trim() || `漫画 ${comicId}`;
+  const title = String(item.title ?? '').trim() || `漫画 ${comicId}`;
   const subtitle = [item.authors, item.status, item.last_update_chapter_name]
-    .map((value) => String(value ?? "").trim())
+    .map((value) => String(value ?? '').trim())
     .filter(Boolean)
-    .join(" · ");
-  const coverUrl = String(item.cover ?? "").trim();
-  const statusText = String(item.status ?? "").trim();
+    .join(' · ');
+  const coverUrl = String(item.cover ?? '').trim();
+  const statusText = String(item.status ?? '').trim();
   const typeValues = splitTypeValues(item.types);
-  const authorValues = String(item.authors ?? "")
-    .split(/[\/,，]/g)
+  const authorValues = String(item.authors ?? '')
+    .split(/[/,，]/g)
     .map((value) => value.trim())
     .filter(Boolean);
   const path = `comic/${comicId}/cover.jpg`;
@@ -634,47 +616,40 @@ function mapSearchItemToComicGrid(item: SearchApiComic) {
       name: `${comicId}.jpg`,
       extern: {
         path,
-        comicPy: String(item.comic_py ?? "").trim(),
+        comicPy: String(item.comic_py ?? '').trim(),
       },
     },
     metadata: [
-      createBasicMetadata("author", "作者", authorValues),
-      createBasicMetadata("categories", "分类", typeValues),
-      createBasicMetadata("status", "状态", statusText ? [statusText] : []),
+      createBasicMetadata('author', '作者', authorValues),
+      createBasicMetadata('categories', '分类', typeValues),
+      createBasicMetadata('status', '状态', statusText ? [statusText] : []),
       createBasicMetadata(
-        "latest",
-        "更新",
-        item.last_update_chapter_name ? [item.last_update_chapter_name] : [],
+        'latest',
+        '更新',
+        item.last_update_chapter_name ? [item.last_update_chapter_name] : []
       ),
-      createBasicMetadata("works", "作品", []),
-      createBasicMetadata("actors", "角色", []),
+      createBasicMetadata('works', '作品', []),
+      createBasicMetadata('actors', '角色', []),
     ],
     raw: item,
     extern: {
       comicId,
-      comicPy: String(item.comic_py ?? "").trim(),
+      comicPy: String(item.comic_py ?? '').trim(),
     },
   };
 }
 
-function buildTitleMeta(input: {
-  statusText: string;
-  updateText: string;
-  chapterCount: number;
-}) {
+function buildTitleMeta(input: { statusText: string; updateText: string; chapterCount: number }) {
   return [
-    createActionItem(`连载状态：${input.statusText || "未知"}`),
-    createActionItem(`更新时间：${input.updateText || "未知"}`),
+    createActionItem(`连载状态：${input.statusText || '未知'}`),
+    createActionItem(`更新时间：${input.updateText || '未知'}`),
     createActionItem(`章节数：${input.chapterCount}`),
   ];
 }
 
 async function fetchJsonOrThrow<T>(url: string) {
   const headers = await getDefaultHeaders();
-  const res = await fetch(url, {
-    method: "GET",
-    headers,
-  });
+  const res = await wretch(url).headers(headers).get().res();
   if (!res.ok) {
     throw new Error(`请求失败(${res.status})`);
   }
@@ -688,9 +663,9 @@ function pickChapterFromEps(
     order: number;
     extension: Record<string, unknown>;
   }>,
-  payload: ReadSnapshotPayload,
+  payload: ReadSnapshotPayload
 ) {
-  const chapterIdInput = String(payload.chapterId ?? "").trim();
+  const chapterIdInput = String(payload.chapterId ?? '').trim();
   const externInput = toStringMap(payload.extern);
   const orderFromExtern = toNumber(externInput.order, 0);
 
@@ -704,15 +679,15 @@ function pickChapterFromEps(
 }
 
 function sanitizeFileName(name: string) {
-  const sanitized = name.replace(/[\\/:*?"<>|]/g, "_").trim();
-  return sanitized || "image.jpg";
+  const sanitized = name.replace(/[\\/:*?"<>|]/g, '_').trim();
+  return sanitized || 'image.jpg';
 }
 
 function extractImageName(imageUrl: string, index: number) {
-  const fallback = `page-${String(index + 1).padStart(3, "0")}.jpg`;
+  const fallback = `page-${String(index + 1).padStart(3, '0')}.jpg`;
   try {
     const parsed = new URL(imageUrl);
-    const segment = parsed.pathname.split("/").filter(Boolean).pop();
+    const segment = parsed.pathname.split('/').filter(Boolean).pop();
     if (!segment) return fallback;
     const decoded = decodeURIComponent(segment);
     return sanitizeFileName(decoded);
@@ -724,7 +699,7 @@ function extractImageName(imageUrl: string, index: number) {
 function mapActionForSnapshot(item: unknown) {
   const row = toStringMap(item);
   return {
-    name: String(row.name ?? ""),
+    name: String(row.name ?? ''),
     onTap: toStringMap(row.onTap),
     extern: toStringMap(row.extension),
   };
@@ -734,22 +709,18 @@ function mapMetadataForSnapshot(meta: unknown) {
   const row = toStringMap(meta);
   const values = Array.isArray(row.value) ? row.value : [];
   return {
-    type: String(row.type ?? ""),
-    name: String(row.name ?? ""),
+    type: String(row.type ?? ''),
+    name: String(row.name ?? ''),
     value: values.map((item) => mapActionForSnapshot(item)),
   };
 }
 
-async function getChapterData(
-  comicId: string,
-  chapterId: string,
-  retryAfterLogin = true,
-) {
+async function getChapterData(comicId: string, chapterId: string, retryAfterLogin = true) {
   const params = new URLSearchParams(getDefaultParams());
   const apiUrl = `${API_BASE}/comic/chapter/${encodeURIComponent(comicId)}/${encodeURIComponent(chapterId)}?${params.toString()}`;
   const response = await fetchJsonOrThrow<ApiResponse<ChapterApiData>>(apiUrl);
   if (response.errno !== 0) {
-    console.error("[zmh] chapter api failed", {
+    console.error('[zmh] chapter api failed', {
       apiUrl,
       comicId,
       chapterId,
@@ -757,9 +728,7 @@ async function getChapterData(
       errmsg: response.errmsg,
       data: response.data,
     });
-    throw new Error(
-      `加载章节失败(${response.errno}): ${response.errmsg || "未知错误"}`,
-    );
+    throw new Error(`加载章节失败(${response.errno}): ${response.errmsg || '未知错误'}`);
   }
   const node = toStringMap(toStringMap(response.data).data) as ChapterApiInfo;
   const images = (
@@ -773,7 +742,7 @@ async function getChapterData(
   if (!readable) {
     const token = await loadAuthToken();
     if (token) {
-      console.error("[zmh] chapter permission insufficient", {
+      console.error('[zmh] chapter permission insufficient', {
         apiUrl,
         comicId,
         chapterId,
@@ -784,11 +753,11 @@ async function getChapterData(
     }
 
     if (retryAfterLogin) {
-      await loginWithStoredCredentials("chapter.need_permission");
+      await loginWithStoredCredentials('chapter.need_permission');
       return getChapterData(comicId, chapterId, false);
     }
 
-    console.error("[zmh] chapter images empty", {
+    console.error('[zmh] chapter images empty', {
       apiUrl,
       comicId,
       chapterId,
@@ -799,9 +768,9 @@ async function getChapterData(
   }
   return {
     chapterId: String(node.chapter_id ?? chapterId),
-    chapterName: String(node.title ?? "").trim(),
+    chapterName: String(node.title ?? '').trim(),
     chapterOrder: toNumber(node.chapter_order, 0),
-    imageUrls: images.map((url) => String(url ?? "").trim()).filter(Boolean),
+    imageUrls: images.map((url) => String(url ?? '').trim()).filter(Boolean),
   };
 }
 
@@ -812,29 +781,25 @@ async function getInfo() {
 async function searchComic(payload: SearchPayload = {}) {
   const extern = toStringMap(payload.extern);
   const page = Math.max(1, Number(payload.page ?? 1) || 1);
-  const keyword = String(payload.keyword ?? extern.keyword ?? "").trim();
+  const keyword = String(payload.keyword ?? extern.keyword ?? '').trim();
   if (!keyword) {
-    throw new Error("keyword 不能为空");
+    throw new Error('keyword 不能为空');
   }
   const params = new URLSearchParams({
     keyword,
     page: String(page),
-    sort: "0",
-    size: "20",
+    sort: '0',
+    size: '20',
     ...getDefaultParams(),
   });
   const apiUrl = `${API_BASE}/search/index?${params.toString()}`;
   const response = await fetchJsonOrThrow<ApiResponse<SearchApiData>>(apiUrl);
   if (response.errno !== 0) {
-    throw new Error(response.errmsg || "搜索失败");
+    throw new Error(response.errmsg || '搜索失败');
   }
   const apiData = toStringMap(response.data);
-  const list = (
-    Array.isArray(apiData.list) ? apiData.list : []
-  ) as SearchApiComic[];
-  const items = list
-    .map((item) => mapSearchItemToComicGrid(item))
-    .filter((item) => item.id);
+  const list = (Array.isArray(apiData.list) ? apiData.list : []) as SearchApiComic[];
+  const items = list.map((item) => mapSearchItemToComicGrid(item)).filter((item) => item.id);
   const total = toNumber(apiData.total, items.length);
   const pageSize = Math.max(1, toNumber(apiData.size, 20));
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -844,10 +809,10 @@ async function searchComic(payload: SearchPayload = {}) {
     source: PLUGIN_ID,
     extern: payload.extern ?? null,
     scheme: {
-      version: "1.0.0",
-      type: "searchResult",
+      version: '1.0.0',
+      type: 'searchResult',
       source: PLUGIN_ID,
-      list: "comicGrid",
+      list: 'comicGrid',
     },
     data: {
       paging,
@@ -859,16 +824,15 @@ async function searchComic(payload: SearchPayload = {}) {
 }
 
 async function getComicDetail(payload: ComicDetailPayload = {}) {
-  const comicId = String(payload.comicId ?? "").trim();
+  const comicId = String(payload.comicId ?? '').trim();
   if (!comicId) {
-    throw new Error("comicId 不能为空");
+    throw new Error('comicId 不能为空');
   }
   const params = new URLSearchParams(getDefaultParams());
   const detailUrl = `${API_BASE}/comic/detail/${encodeURIComponent(comicId)}?${params.toString()}`;
-  const response =
-    await fetchJsonOrThrow<ApiResponse<Record<string, unknown>>>(detailUrl);
+  const response = await fetchJsonOrThrow<ApiResponse<Record<string, unknown>>>(detailUrl);
   if (response.errno !== 0) {
-    throw new Error(response.errmsg || "加载漫画详情失败");
+    throw new Error(response.errmsg || '加载漫画详情失败');
   }
 
   const rootData = toStringMap(response.data);
@@ -883,17 +847,14 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
   let orderCount = 1;
   const eps = chapterGroups
     .flatMap((group, groupIndex) => {
-      const groupTitle =
-        String(group.title ?? "").trim() || `分组${groupIndex + 1}`;
+      const groupTitle = String(group.title ?? '').trim() || `分组${groupIndex + 1}`;
       const chapters = Array.isArray(group.data) ? group.data : [];
       return chapters
         .map((item, chapterIndex) => {
-          const id = String(item.chapter_id ?? "").trim();
+          const id = String(item.chapter_id ?? '').trim();
           if (!id) return null;
           const order = toNumber(orderCount++, chapterIndex + 1);
-          const chapterTitle =
-            String(item.chapter_title ?? "").trim() ||
-            `第${chapterIndex + 1}话`;
+          const chapterTitle = String(item.chapter_title ?? '').trim() || `第${chapterIndex + 1}话`;
           return {
             id,
             name: `${groupTitle}—${chapterTitle}`,
@@ -910,11 +871,10 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
         .filter((item): item is NonNullable<typeof item> => item !== null);
     })
     .reverse();
-  const title = String(detail.title ?? "").trim() || `漫画 #${comicId}`;
-  const coverUrl = String(detail.cover ?? "").trim();
-  const comicPy = String(detail.comic_py ?? "").trim();
-  const creatorName = authorNames[0] || "未知作者";
-  const statusText = statusNames.join(" / ");
+  const title = String(detail.title ?? '').trim() || `漫画 #${comicId}`;
+  const coverUrl = String(detail.cover ?? '').trim();
+  const comicPy = String(detail.comic_py ?? '').trim();
+  const statusText = statusNames.join(' / ');
   const updateText = formatUnixSeconds(detail.last_updatetime);
 
   const normal = {
@@ -927,19 +887,19 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
         chapterCount: eps.length,
       }),
       creator: {
-        id: "",
-        name: "",
+        id: '',
+        name: '',
         avatar: createImage({
-          id: "",
-          url: "",
-          name: "",
-          path: "",
+          id: '',
+          url: '',
+          name: '',
+          path: '',
           extension: {},
         }),
         onTap: {},
         extension: {},
       },
-      description: String(detail.description ?? ""),
+      description: String(detail.description ?? ''),
       cover: createImage({
         id: String(detail.id ?? comicId),
         url: coverUrl || NOT_FOUND_IMAGE_URL,
@@ -950,8 +910,8 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
         },
       }),
       metadata: [
-        createMetadataActionList("types", "分类", typeNames),
-        createMetadataActionList("authors", "作者", authorNames),
+        createMetadataActionList('types', '分类', typeNames),
+        createMetadataActionList('authors', '作者', authorNames),
       ].filter((meta) => {
         const value = toStringMap(meta).value;
         return Array.isArray(value) && value.length > 0;
@@ -978,8 +938,8 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
   };
 
   const scheme = {
-    version: "1.0.0",
-    type: "comicDetail",
+    version: '1.0.0',
+    type: 'comicDetail',
     source: PLUGIN_ID,
   };
 
@@ -1004,13 +964,13 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
 
 async function getChapter(payload: ChapterPayload = {}) {
   const extern = toStringMap(payload.extern);
-  const comicId = String(payload.comicId ?? extern.comicId ?? "").trim();
-  const chapterId = String(payload.chapterId ?? extern.chapterId ?? "").trim();
+  const comicId = String(payload.comicId ?? extern.comicId ?? '').trim();
+  const chapterId = String(payload.chapterId ?? extern.chapterId ?? '').trim();
   if (!comicId) {
-    throw new Error("comicId 不能为空");
+    throw new Error('comicId 不能为空');
   }
   if (!chapterId) {
-    throw new Error("chapterId 不能为空");
+    throw new Error('chapterId 不能为空');
   }
 
   const chapterData = await getChapterData(comicId, chapterId);
@@ -1044,8 +1004,8 @@ async function getChapter(payload: ChapterPayload = {}) {
     chapterId: currentChapterId,
     extern: payload.extern ?? null,
     scheme: {
-      version: "1.0.0",
-      type: "chapterContent",
+      version: '1.0.0',
+      type: 'chapterContent',
       source: PLUGIN_ID,
     },
     data: {
@@ -1056,9 +1016,9 @@ async function getChapter(payload: ChapterPayload = {}) {
 }
 
 async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
-  const comicId = String(payload.comicId ?? "").trim();
+  const comicId = String(payload.comicId ?? '').trim();
   if (!comicId) {
-    throw new Error("comicId 不能为空");
+    throw new Error('comicId 不能为空');
   }
 
   const detail = await getComicDetail({ comicId, extern: payload.extern });
@@ -1067,15 +1027,15 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
   const eps = (Array.isArray(normal.eps) ? normal.eps : [])
     .map((item) => toStringMap(item))
     .map((item) => ({
-      id: String(item.id ?? "").trim(),
-      name: String(item.name ?? "").trim(),
+      id: String(item.id ?? '').trim(),
+      name: String(item.name ?? '').trim(),
       order: toNumber(item.order, 0),
       extension: toStringMap(item.extension),
     }))
     .filter((item) => item.id);
   const targetChapter = pickChapterFromEps(eps, payload);
   if (!targetChapter) {
-    throw new Error("未找到可阅读章节");
+    throw new Error('未找到可阅读章节');
   }
 
   const chapterData = await getChapterData(comicId, targetChapter.id);
@@ -1106,8 +1066,8 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
       comic: {
         id: String(comicInfo.id ?? comicId),
         source: PLUGIN_ID,
-        title: String(comicInfo.title ?? ""),
-        description: String(comicInfo.description ?? ""),
+        title: String(comicInfo.title ?? ''),
+        description: String(comicInfo.description ?? ''),
         cover: {
           ...toStringMap(comicInfo.cover),
           extern: toStringMap(toStringMap(comicInfo.cover).extension),
@@ -1116,16 +1076,13 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
           ...toStringMap(comicInfo.creator),
           avatar: {
             ...toStringMap(toStringMap(comicInfo.creator).avatar),
-            extern: toStringMap(
-              toStringMap(toStringMap(comicInfo.creator).avatar).extension,
-            ),
+            extern: toStringMap(toStringMap(toStringMap(comicInfo.creator).avatar).extension),
           },
           extern: toStringMap(toStringMap(comicInfo.creator).extension),
         },
-        titleMeta: (Array.isArray(comicInfo.titleMeta)
-          ? comicInfo.titleMeta
-          : []
-        ).map((item) => mapActionForSnapshot(item)),
+        titleMeta: (Array.isArray(comicInfo.titleMeta) ? comicInfo.titleMeta : []).map((item) =>
+          mapActionForSnapshot(item)
+        ),
         metadata: (Array.isArray(comicInfo.metadata) ? comicInfo.metadata : [])
           .map((meta) => mapMetadataForSnapshot(meta))
           .filter((meta) => meta.value.length > 0),
@@ -1137,7 +1094,7 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
         order: chapterData.chapterOrder || targetChapter.order,
         pages,
         extern: {
-          source: "v4api",
+          source: 'v4api',
         },
       },
       chapters,
@@ -1145,18 +1102,14 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
   };
 }
 
-async function fetchImageBytes({
-  url = "",
-  timeoutMs = 30000,
-}: FetchImagePayload = {}) {
+async function fetchImageBytes({ url = '', timeoutMs = 30000 }: FetchImagePayload = {}) {
   const targetUrl = String(url).trim();
   if (!targetUrl) {
-    throw new Error("url 不能为空");
+    throw new Error('url 不能为空');
   }
 
   const requestHeaders = await getDefaultHeaders();
-  const controller =
-    typeof AbortController !== "undefined" ? new AbortController() : undefined;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
   const resolvedTimeout = Math.max(0, Number(timeoutMs) || 30000);
   const timer = controller
     ? setTimeout(() => {
@@ -1166,15 +1119,17 @@ async function fetchImageBytes({
 
   let response: Response;
   try {
-    response = await fetch(targetUrl, {
-      method: "GET",
-      headers: {
+    response = await wretch(targetUrl)
+      .headers({
         ...requestHeaders,
-        Referer: "https://www.zaimanhua.com/",
-        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-      },
-      signal: controller?.signal,
-    });
+        Referer: 'https://www.zaimanhua.com/',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      })
+      .options({
+        signal: controller?.signal,
+      })
+      .get()
+      .res();
   } finally {
     if (timer) {
       clearTimeout(timer);
@@ -1187,42 +1142,36 @@ async function fetchImageBytes({
 
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (bytes.byteLength === 0) {
-    throw new Error("图片数据为空");
+    throw new Error('图片数据为空');
   }
-  const nativeBufferId = await runtime.native.put(bytes);
 
-  return {
-    nativeBufferId: Number(nativeBufferId),
-  };
+  return bytes;
 }
 
 async function getSettingsBundle() {
-  const [account, password] = await Promise.all([
-    loadAuthAccount(),
-    loadAuthPassword(),
-  ]);
+  const [account, password] = await Promise.all([loadAuthAccount(), loadAuthPassword()]);
 
   return {
     source: PLUGIN_ID,
     scheme: {
-      version: "1.0.0",
-      type: "settings",
+      version: '1.0.0',
+      type: 'settings',
       sections: [
         {
-          id: "account",
-          title: "账号",
+          id: 'account',
+          title: '账号',
           fields: [
             {
               key: AUTH_ACCOUNT_CONFIG_KEY,
-              kind: "text",
-              label: "用户名",
-              fnPath: "setAccountAndLogin",
+              kind: 'text',
+              label: '用户名',
+              fnPath: 'setAccountAndLogin',
             },
             {
               key: AUTH_PASSWORD_CONFIG_KEY,
-              kind: "password",
-              label: "密码",
-              fnPath: "setPasswordAndLogin",
+              kind: 'password',
+              label: '密码',
+              fnPath: 'setPasswordAndLogin',
             },
           ],
         },
@@ -1242,23 +1191,20 @@ async function init() {
   if (!zmhInitStarted) {
     zmhInitStarted = true;
     try {
-      const [account, password] = await Promise.all([
-        loadAuthAccount(),
-        loadAuthPassword(),
-      ]);
+      const [account, password] = await Promise.all([loadAuthAccount(), loadAuthPassword()]);
       if (account && String(password).trim()) {
         await loginWithPassword({
           account,
           password,
-          reason: "init",
+          reason: 'init',
           persistCredentials: true,
         });
-        console.info("[zmh.init] login success");
+        console.info('[zmh.init] login success');
       } else {
-        console.info("[zmh.init] skip login: no credentials");
+        console.info('[zmh.init] skip login: no credentials');
       }
     } catch (error) {
-      console.warn("[zmh.init] login failed", error);
+      console.warn('[zmh.init] login failed', error);
     }
   }
 
