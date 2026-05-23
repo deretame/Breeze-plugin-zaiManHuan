@@ -1,16 +1,18 @@
 {
-  "name": "zai-man-hua",
-  "private": true,
-  "version": "0.1.0",
+  "name": "breeze-plugin-zai-man-hua",
+  "version": "0.0.3",
   "type": "module",
   "packageManager": "pnpm@10.27.0",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "build": "pnpm typecheck && node --import tsx build/generate-manifest.ts && cross-env NODE_OPTIONS=\"--import tsx\" rspack build && node --import tsx build/generate-brotli.ts",
+    "build": "node --import tsx build/generate-version.ts && pnpm typecheck && node --import tsx build/generate-manifest.ts && cross-env NODE_OPTIONS=\"--import tsx\" rspack build && node --import tsx build/generate-brotli.ts",
     "dev": "pnpm dev:serve",
     "dev:serve": "tsx dev-server.ts"
   },
