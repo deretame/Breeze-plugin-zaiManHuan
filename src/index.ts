@@ -934,7 +934,7 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
     allowComments: false,
     allowLike: false,
     allowCollected: false,
-    allowDownload: true,
+    allowDownload: false,
     extension: {
       comicPy,
       subscribeNum: toNumber(detail.subscribe_num, 0),
