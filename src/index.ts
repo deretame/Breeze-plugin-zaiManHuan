@@ -10,6 +10,16 @@ import {
 } from './common';
 import { buildPluginInfo } from './get-info';
 import { flutterTools, pluginConfig } from './tools';
+import type {
+  CapabilitiesBundleContract,
+  ChapterContentContract,
+  ComicDetailContract,
+  InfoContract,
+  MetadataListItem,
+  ReadSnapshotContract,
+  SearchResultContract,
+  SettingsBundleContract,
+} from '../types/type';
 
 type BasePayload = {
   extern?: Record<string, unknown>;
@@ -665,7 +675,7 @@ function pickChapterFromEps(
     id: string;
     name: string;
     order: number;
-    extension: Record<string, unknown>;
+    extern: Record<string, unknown>;
   }>,
   payload: ReadSnapshotPayload
 ) {
@@ -698,25 +708,6 @@ function extractImageName(imageUrl: string, index: number) {
   } catch {
     return fallback;
   }
-}
-
-function mapActionForSnapshot(item: unknown) {
-  const row = toStringMap(item);
-  return {
-    name: String(row.name ?? ''),
-    onTap: toStringMap(row.onTap),
-    extern: toStringMap(row.extension),
-  };
-}
-
-function mapMetadataForSnapshot(meta: unknown) {
-  const row = toStringMap(meta);
-  const values = Array.isArray(row.value) ? row.value : [];
-  return {
-    type: String(row.type ?? ''),
-    name: String(row.name ?? ''),
-    value: values.map((item) => mapActionForSnapshot(item)),
-  };
 }
 
 async function getChapterData(comicId: string, chapterId: string, retryAfterLogin = true) {
@@ -778,11 +769,11 @@ async function getChapterData(comicId: string, chapterId: string, retryAfterLogi
   };
 }
 
-async function getInfo() {
+async function getInfo(): Promise<InfoContract> {
   return buildPluginInfo();
 }
 
-async function searchComic(payload: SearchPayload = {}) {
+async function searchComic(payload: SearchPayload = {}): Promise<SearchResultContract> {
   const extern = toStringMap(payload.extern);
   const page = Math.max(1, Number(payload.page ?? 1) || 1);
   const keyword = String(payload.keyword ?? extern.keyword ?? '').trim();
@@ -827,7 +818,7 @@ async function searchComic(payload: SearchPayload = {}) {
   };
 }
 
-async function getComicDetail(payload: ComicDetailPayload = {}) {
+async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDetailContract> {
   const comicId = String(payload.comicId ?? '').trim();
   if (!comicId) {
     throw new Error('comicId 不能为空');
@@ -861,9 +852,12 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
           const chapterTitle = String(item.chapter_title ?? '').trim() || `第${chapterIndex + 1}话`;
           return {
             id,
+            requestId: id,
+            logicalKey: id,
+            storageChapterId: id,
             name: `${groupTitle}—${chapterTitle}`,
             order,
-            extension: {
+            extern: {
               sort: order,
               groupTitle,
               isFee: Boolean(item.is_fee),
@@ -898,10 +892,10 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
           url: '',
           name: '',
           path: '',
-          extension: {},
+          extern: {},
         }),
         onTap: {},
-        extension: {},
+        extern: {},
       },
       description: String(detail.description ?? ''),
       cover: createImage({
@@ -909,18 +903,13 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
         url: coverUrl || NOT_FOUND_IMAGE_URL,
         name: `${String(detail.id ?? comicId)}.jpg`,
         path: `comic/${String(detail.id ?? comicId)}/cover.jpg`,
-        extension: {
-          comicPy,
-        },
+        extern: { comicPy },
       }),
       metadata: [
         createMetadataActionList('types', '分类', typeNames),
         createMetadataActionList('authors', '作者', authorNames),
-      ].filter((meta) => {
-        const value = toStringMap(meta).value;
-        return Array.isArray(value) && value.length > 0;
-      }),
-      extension: {
+      ].filter((item): item is MetadataListItem => item != null),
+      extern: {
         comicPy,
       },
     },
@@ -934,16 +923,16 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
     allowComments: false,
     allowLike: false,
     allowCollected: false,
-    allowDownload: false,
-    extension: {
+    allowDownload: true,
+    extern: {
       comicPy,
       subscribeNum: toNumber(detail.subscribe_num, 0),
     },
   };
 
   const scheme = {
-    version: '1.0.0',
-    type: 'comicDetail',
+    version: '1.0.0' as const,
+    type: 'comicDetail' as const,
     source: PLUGIN_ID,
   };
 
@@ -955,7 +944,7 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
     },
   };
 
-  console.log(eps);
+  console.log(data);
 
   return {
     source: PLUGIN_ID,
@@ -966,7 +955,7 @@ async function getComicDetail(payload: ComicDetailPayload = {}) {
   };
 }
 
-async function getChapter(payload: ChapterPayload = {}) {
+async function getChapter(payload: ChapterPayload = {}): Promise<ChapterContentContract> {
   const extern = toStringMap(payload.extern);
   const comicId = String(payload.comicId ?? extern.comicId ?? '').trim();
   const chapterId = String(payload.chapterId ?? extern.chapterId ?? '').trim();
@@ -993,33 +982,39 @@ async function getChapter(payload: ChapterPayload = {}) {
     };
   });
 
-  const chapter = {
-    epId: currentChapterId,
-    epName: chapterData.chapterName || `章节 ${currentChapterId}`,
-    length: docs.length,
-    epPages: String(docs.length),
-    docs,
-    series: [],
-  };
-
   return {
     source: PLUGIN_ID,
     comicId,
     chapterId: currentChapterId,
     extern: payload.extern ?? null,
     scheme: {
-      version: '1.0.0',
-      type: 'chapterContent',
+      version: '1.0.0' as const,
+      type: 'chapterContent' as const,
       source: PLUGIN_ID,
     },
     data: {
-      chapter,
+      comic: {
+        id: comicId,
+        source: PLUGIN_ID,
+        title: chapterData.chapterName || `章节 ${currentChapterId}`,
+        extern: {},
+      },
+      chapter: {
+        id: currentChapterId,
+        requestId: '',
+        logicalKey: '',
+        storageChapterId: '',
+        name: chapterData.chapterName || `章节 ${currentChapterId}`,
+        order: chapterData.chapterOrder,
+        pages: docs,
+        extern: {},
+      },
+      chapters: [],
     },
-    chapter,
   };
 }
 
-async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
+async function getReadSnapshot(payload: ReadSnapshotPayload = {}): Promise<ReadSnapshotContract> {
   const comicId = String(payload.comicId ?? '').trim();
   if (!comicId) {
     throw new Error('comicId 不能为空');
@@ -1034,7 +1029,7 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
       id: String(item.id ?? '').trim(),
       name: String(item.name ?? '').trim(),
       order: toNumber(item.order, 0),
-      extension: toStringMap(item.extension),
+      extern: toStringMap(item.extern),
     }))
     .filter((item) => item.id);
   const targetChapter = pickChapterFromEps(eps, payload);
@@ -1060,7 +1055,7 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
     id: item.id,
     name: item.name || `章节 ${item.id}`,
     order: item.order,
-    extern: item.extension,
+    extern: item.extern,
   }));
 
   return {
@@ -1071,35 +1066,17 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}) {
         id: String(comicInfo.id ?? comicId),
         source: PLUGIN_ID,
         title: String(comicInfo.title ?? ''),
-        description: String(comicInfo.description ?? ''),
-        cover: {
-          ...toStringMap(comicInfo.cover),
-          extern: toStringMap(toStringMap(comicInfo.cover).extension),
-        },
-        creator: {
-          ...toStringMap(comicInfo.creator),
-          avatar: {
-            ...toStringMap(toStringMap(comicInfo.creator).avatar),
-            extern: toStringMap(toStringMap(toStringMap(comicInfo.creator).avatar).extension),
-          },
-          extern: toStringMap(toStringMap(comicInfo.creator).extension),
-        },
-        titleMeta: (Array.isArray(comicInfo.titleMeta) ? comicInfo.titleMeta : []).map((item) =>
-          mapActionForSnapshot(item)
-        ),
-        metadata: (Array.isArray(comicInfo.metadata) ? comicInfo.metadata : [])
-          .map((meta) => mapMetadataForSnapshot(meta))
-          .filter((meta) => meta.value.length > 0),
-        extern: toStringMap(comicInfo.extension),
+        extern: toStringMap(comicInfo.extern),
       },
       chapter: {
         id: chapterData.chapterId,
+        requestId: '',
+        logicalKey: '',
+        storageChapterId: '',
         name: chapterData.chapterName || targetChapter.name,
         order: chapterData.chapterOrder || targetChapter.order,
         pages,
-        extern: {
-          source: 'v4api',
-        },
+        extern: { source: 'v4api' },
       },
       chapters,
     },
@@ -1152,7 +1129,7 @@ async function fetchImageBytes({ url = '', timeoutMs = 30000 }: FetchImagePayloa
   return bytes;
 }
 
-async function getSettingsBundle() {
+async function getSettingsBundle(): Promise<SettingsBundleContract> {
   const [account, password] = await Promise.all([loadAuthAccount(), loadAuthPassword()]);
 
   return {
@@ -1222,6 +1199,18 @@ async function init() {
   };
 }
 
+export async function getCapabilitiesBundle(): Promise<CapabilitiesBundleContract> {
+  return {
+    source: PLUGIN_ID,
+    scheme: {
+      version: '1.0.0' as const,
+      type: 'capabilities' as const,
+      actions: [],
+    },
+    data: {},
+  };
+}
+
 export default {
   init,
   getInfo,
@@ -1234,4 +1223,5 @@ export default {
   getReadSnapshot,
   fetchImageBytes,
   getSettingsBundle,
+  getCapabilitiesBundle,
 };
