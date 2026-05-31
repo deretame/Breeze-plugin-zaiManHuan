@@ -1,6 +1,6 @@
 {
   "name": "breeze-plugin-zai-man-hua",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "packageManager": "pnpm@10.27.0",
   "files": [
@@ -17,16 +17,16 @@
     "dev:serve": "tsx dev-server.ts"
   },
   "devDependencies": {
-    "@rspack/cli": "^1.5.7",
-    "@rspack/core": "^1.5.7",
-    "@types/node": "^24.6.0",
+    "@rspack/cli": "^2.0.5",
+    "@rspack/core": "^2.0.5",
+    "@types/node": "^25.9.1",
     "cross-env": "^10.1.0",
-    "oxlint": "^1.63.0",
+    "oxlint": "^1.67.0",
     "prettier": "^3.8.3",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
-    "wretch": "^3.0.7"
+    "wretch": "^3.0.8"
   }
 }

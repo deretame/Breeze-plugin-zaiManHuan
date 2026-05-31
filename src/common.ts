@@ -1,3 +1,12 @@
+import type {
+  ActionItem,
+  ComicListItem,
+  ImageItem,
+  MetadataListItem,
+  PagingInfo,
+  StringMap,
+} from '../types/type';
+
 export const PLUGIN_ID = '65c18db5-eb13-40d0-9ab4-31f473536aa1';
 export const NOT_FOUND_IMAGE_URL = '';
 export const PLACEHOLDER_IMAGE_PATH = 'placeholder/image-404.png';
@@ -12,12 +21,12 @@ export function toStringMap(value: unknown): Record<string, unknown> {
 export function createActionItem(
   name: unknown,
   onTap: Record<string, unknown> = {},
-  extension: Record<string, unknown> = {}
-) {
+  extern: Record<string, unknown> = {}
+): ActionItem {
   return {
     name: String(name ?? ''),
-    onTap,
-    extension,
+    onTap: onTap as StringMap,
+    extern: extern as StringMap,
   };
 }
 
@@ -27,15 +36,15 @@ export function createImage(
     url?: unknown;
     name?: unknown;
     path?: unknown;
-    extension?: Record<string, unknown>;
+    extern?: Record<string, unknown>;
   } = {}
-) {
+): ImageItem {
   return {
     id: String(input.id ?? ''),
     url: String(input.url ?? '').trim() || NOT_FOUND_IMAGE_URL,
     name: String(input.name ?? ''),
     path: String(input.path ?? '').trim() || PLACEHOLDER_IMAGE_PATH,
-    extension: input.extension ?? {},
+    extern: (input.extern ?? {}) as StringMap,
   };
 }
 
@@ -43,13 +52,17 @@ export function createMetadataActionList(
   type: string,
   name: string,
   values: unknown,
-  mapItem?: (value: string) => ReturnType<typeof createActionItem>
-) {
+  mapItem?: (value: string) => ActionItem
+): MetadataListItem | null {
   const list = Array.isArray(values) ? values : values == null ? [] : [values];
   const normalized = list
     .map((item) => String(item ?? '').trim())
     .filter((item) => item.length > 0)
     .map((item) => (mapItem ? mapItem(item) : createActionItem(item)));
+
+  if (!normalized.length) {
+    return null;
+  }
 
   return {
     type,
@@ -58,16 +71,19 @@ export function createMetadataActionList(
   };
 }
 
-export function createBasicMetadata(type: string, name: string, values: unknown) {
+export function createBasicMetadata(type: string, name: string, values: unknown): MetadataListItem {
   const list = Array.isArray(values) ? values : values == null ? [] : [values];
   return {
     type,
     name,
-    value: list.map((item) => String(item ?? '').trim()).filter(Boolean),
+    value: list
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean)
+      .map((item) => createActionItem(item)),
   };
 }
 
-export function createComicItem(id: string, title: string) {
+export function createComicItem(id: string, title: string): ComicListItem {
   const path = `comic/${id}/cover.png`;
   return {
     source: PLUGIN_ID,
@@ -91,21 +107,15 @@ export function createComicItem(id: string, title: string) {
       createBasicMetadata('tags', '标签', ['example', 'placeholder']),
       createBasicMetadata('works', '作品', []),
       createBasicMetadata('actors', '角色', []),
-    ],
+    ].filter((item): item is MetadataListItem => item != null),
     raw: {
       id,
       name: title,
       author: 'example-author',
       description: 'placeholder',
       image: NOT_FOUND_IMAGE_URL,
-      category: {
-        id: '',
-        title: '',
-      },
-      category_sub: {
-        id: null,
-        title: null,
-      },
+      category: { id: '', title: '' },
+      category_sub: { id: null, title: null },
       liked: false,
       is_favorite: false,
       update_at: 0,
@@ -120,7 +130,7 @@ export function createComicItem(id: string, title: string) {
   };
 }
 
-export function createPaging(page = 1, total = 1) {
+export function createPaging(page = 1, total = 1): PagingInfo {
   return {
     page,
     pages: Math.max(1, total),
