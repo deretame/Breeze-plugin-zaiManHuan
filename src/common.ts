@@ -5,7 +5,7 @@ import type {
   MetadataListItem,
   PagingInfo,
   StringMap,
-} from '../types/type';
+} from 'breeze-plugin-kit';
 
 export const PLUGIN_ID = '65c18db5-eb13-40d0-9ab4-31f473536aa1';
 export const NOT_FOUND_IMAGE_URL = '';
