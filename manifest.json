@@ -7,9 +7,101 @@
     "describe": ""
   },
   "describe": "再漫画插件",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "home": "https://github.com/deretame/Breeze-plugin-zaiManHuan",
   "updateUrl": "https://api.github.com/repos/deretame/Breeze-plugin-zaiManHuan/releases/latest",
   "npmName": "breeze-plugin-zai-man-hua",
-  "function": []
+  "function": [
+    {
+      "id": "updates",
+      "title": "更新",
+      "action": {
+        "type": "openComicList",
+        "payload": {
+          "scene": {
+            "title": "更新",
+            "source": "65c18db5-eb13-40d0-9ab4-31f473536aa1",
+            "body": {
+              "type": "pluginPagedComicList",
+              "request": {
+                "fnPath": "getUpdatesData",
+                "core": {},
+                "extern": {
+                  "source": "updates"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "categories",
+      "title": "分类",
+      "action": {
+        "type": "openPluginFunction",
+        "payload": {
+          "id": "categories",
+          "title": "分类",
+          "presentation": "page"
+        }
+      }
+    },
+    {
+      "id": "ranking",
+      "title": "排行榜",
+      "action": {
+        "type": "openComicList",
+        "payload": {
+          "scene": {
+            "title": "排行",
+            "source": "65c18db5-eb13-40d0-9ab4-31f473536aa1",
+            "body": {
+              "type": "pluginPagedComicList",
+              "request": {
+                "fnPath": "getRankingData",
+                "core": {},
+                "extern": {
+                  "source": "ranking",
+                  "rankingType": "classic",
+                  "tagId": 0,
+                  "byTime": 0,
+                  "rankType": 0
+                }
+              }
+            },
+            "filter": {
+              "fnPath": "getRankingFilterBundle",
+              "extern": {
+                "source": "ranking"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "subscriptions",
+      "title": "追更",
+      "action": {
+        "type": "openComicList",
+        "payload": {
+          "scene": {
+            "title": "追更",
+            "source": "65c18db5-eb13-40d0-9ab4-31f473536aa1",
+            "body": {
+              "type": "pluginPagedComicList",
+              "request": {
+                "fnPath": "getSubscriptionsData",
+                "core": {},
+                "extern": {
+                  "source": "subscriptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
