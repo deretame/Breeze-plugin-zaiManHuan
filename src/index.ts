@@ -2,27 +2,44 @@ import type {
   CapabilitiesBundleContract,
   ChapterContentContract,
   ComicDetailContract,
+  ComicPagedListContract,
+  CommentFeedContract,
+  CommentFeedPayload,
+  CommentItem,
+  FilterBundleContract,
+  FunctionPageActionGridItem,
+  FunctionPageContract,
   InfoContract,
   MetadataListItem,
   ReadSnapshotContract,
   SearchResultContract,
   SettingsBundleContract,
+  ToggleFavoritePayload,
+  ToggleFavoriteResult,
 } from 'breeze-plugin-kit';
 import { flutterTools, pluginConfig } from 'breeze-plugin-kit';
-import wretch from 'wretch';
+import {
+  APP_BUILD_NUMBER,
+  APP_CHANNEL,
+  APP_VERSION,
+  createApiClient,
+  type ApiResponse,
+} from './api';
 import {
   NOT_FOUND_IMAGE_URL,
+  PLACEHOLDER_IMAGE_PATH,
   PLUGIN_ID,
   createActionItem,
   createBasicMetadata,
   createImage,
-  createMetadataActionList,
   toStringMap,
 } from './common';
 import { buildPluginInfo } from './get-info';
 
 type BasePayload = {
   extern?: Record<string, unknown>;
+  core?: Record<string, unknown>;
+  params?: Record<string, unknown>;
 };
 
 type SearchPayload = BasePayload & {
@@ -57,23 +74,88 @@ type LoginPayload = {
   persistCredentials?: boolean;
 };
 
-type ApiResponse<T> = {
-  errno: number;
-  errmsg: string;
-  data: T;
+type BookshelfPayload = BasePayload & {
+  page?: number;
+  size?: number;
+};
+
+type UpdatePayload = BasePayload & {
+  page?: number;
+  size?: number;
+};
+
+type CategoryPayload = BasePayload & {
+  page?: number;
+  sortType?: number | string;
+  sort?: number | string;
+  theme?: number | string;
+  cate?: number | string;
+  status?: number | string;
+  zone?: number | string;
+};
+
+type RankingPayload = BasePayload & {
+  page?: number;
+  tagId?: number | string;
+  byTime?: number | string;
+  rankType?: number | string;
+  rankingType?: string;
+};
+
+type FunctionPagePayload = BasePayload & {
+  id?: string;
+};
+
+type FavoriteWorkflowAction = 'add' | 'removeAll' | 'removeFromTarget' | 'move';
+
+type FavoriteWorkflowStartPayload = BasePayload & {
+  comicId: string;
+  action: FavoriteWorkflowAction;
+  currentFavorite?: boolean;
+};
+
+type FavoriteWorkflowContinuePayload = BasePayload & {
+  comicId: string;
+  action: FavoriteWorkflowAction;
+  continuationToken: string;
+  input: {
+    cancelled?: boolean;
+    key?: string;
+    value?: unknown;
+    created?: string;
+    values?: Record<string, unknown>;
+  };
+};
+
+type FavoriteWorkflowResult = {
+  status: 'completed' | 'awaitingInput' | 'partial' | 'failed' | 'cancelled';
+  favorited?: boolean;
+  committed?: boolean;
+  message?: string;
+  errorCode?: string;
+  continuationToken?: string;
+  input?: Record<string, unknown>;
 };
 
 type SearchApiComic = {
-  id?: number;
-  comic_id?: number;
+  id?: number | string;
+  comic_id?: number | string;
   title?: string;
-  authors?: string;
+  coverUrl?: string;
+  authors?: string | string[];
   cover?: string;
   status?: string;
-  types?: string;
+  types?: string | string[];
+  lastUpdatedAt?: string;
   hot_hits?: number;
   last_updatetime?: number;
   last_update_chapter_name?: string;
+  lastUpdateChapterId?: number | string;
+  lastUpdateChapterName?: string;
+  subCount?: number | string;
+  viewCount?: number | string;
+  favoriteCount?: number | string;
+  commentCount?: number | string;
   comic_py?: string;
 };
 
@@ -134,10 +216,129 @@ type ChapterApiData = {
   data?: ChapterApiInfo;
 };
 
-const API_BASE = 'https://v4api.zaimanhua.com/app/v1';
-const APP_VERSION = '2.3.4';
-const APP_CHANNEL = '101_01_01_000';
+type CatalogApiComic = {
+  id?: number | string;
+  comic_id?: number | string;
+  title?: string;
+  name?: string;
+  cover?: string;
+  coverUrl?: string;
+  authors?: string | string[];
+  status?: string | number;
+  types?: string | string[];
+  hot_hits?: number | string;
+  hot_num?: number | string;
+  hotNum?: number | string;
+  hit_num?: number | string;
+  viewCount?: number | string;
+  favoriteCount?: number | string;
+  subCount?: number | string;
+  num?: number | string;
+  last_update_chapter_id?: number | string;
+  last_update_chapter_name?: string;
+  chapter_name?: string;
+  last_updatetime?: number | string;
+  lastUpdatedAt?: string;
+  lastUpdateChapterId?: number | string;
+  lastUpdateChapterName?: string;
+  comic_py?: string;
+  is_sub?: boolean | number | string;
+  [key: string]: unknown;
+};
+
+type UnifiedRankingApiData = {
+  list?: CatalogApiComic[];
+  total?: number | string;
+};
+
+type CategoryApiData = {
+  comicList?: CatalogApiComic[];
+  totalNum?: number | string;
+};
+
+type CategoryEntryApiItem = {
+  tagId?: number | string;
+  tagType?: number | string;
+  title?: string;
+  cover?: string;
+  [key: string]: unknown;
+};
+
+type CategoryEntryApiData = {
+  cateList?: CategoryEntryApiItem[];
+};
+
+type BookshelfListApiData = {
+  subList?: unknown[];
+  total?: number | string;
+  totalNum?: number | string;
+  hasNext?: boolean | number | string;
+  hasMore?: boolean | number | string;
+  pageCount?: number | string;
+  pages?: number | string;
+};
+
+type ClassifyApiOption = {
+  tagId?: number | string;
+  tagName?: string;
+};
+
+type ClassifyApiGroup = {
+  title?: string;
+  list?: ClassifyApiOption[];
+};
+
+type ClassifyApiData = {
+  classifyList?: ClassifyApiGroup[];
+};
+
+type RankTypeApiOption = {
+  tag_id?: number | string;
+  tag_name?: string;
+};
+
+type RankTypeApiData = {
+  list?: RankTypeApiOption[];
+};
+
+type CommentApiItem = {
+  id?: number | string;
+  obj_id?: number | string;
+  content?: string;
+  sender_uid?: number | string;
+  reply_amount?: number | string;
+  create_time?: number | string;
+  photo?: string;
+  nickname?: string;
+  author?: {
+    uid?: number | string;
+    nickname?: string;
+    photo?: string;
+    [key: string]: unknown;
+  };
+  replyList?: unknown[];
+  replies?: unknown[];
+  topStatus?: number | string;
+  [key: string]: unknown;
+};
+
+type CommentApiData = {
+  commentIdList?: Array<number | string>;
+  commentList?: Record<string, CommentApiItem> | CommentApiItem[];
+  total?: number | string;
+};
+
+type TaskListApiData = {
+  signInfo?: {
+    current_sign?: unknown;
+    currentSign?: unknown;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
 const USER_AGENT_CONFIG_KEY = 'network.userAgent';
+const CLIENT_ID_CONFIG_KEY = 'network.clientId';
 const AUTH_ACCOUNT_CONFIG_KEY = 'auth.account';
 const AUTH_PASSWORD_CONFIG_KEY = 'auth.password';
 const AUTH_TOKEN_CONFIG_KEY = 'auth.token';
@@ -145,12 +346,47 @@ const AUTH_CREDENTIALS_REQUIRED_ERROR =
   '[AUTH_CREDENTIALS_REQUIRED] 账号或密码不能为空，请先在设置中填写';
 const AUTH_PERMISSION_INSUFFICIENT_ERROR =
   '权限不足，请前往快漫画官方app中提升权限等级（如绑定手机号）';
+const COMIC_SOURCE = '1';
+const UPDATE_PAGE_SIZE = 100;
+const CATEGORY_PAGE_SIZE = 18;
+const SEARCH_PAGE_SIZE = 24;
+const CLASSIC_RANKING_PAGE_SIZE = 10;
+const UNIFIED_RANKING_PAGE_SIZE = 20;
+const COMMENT_PAGE_SIZE = 10;
+const BOOKSHELF_DEFAULT_PAGE_SIZE = 100;
+const RANKING_MODE_OPTIONS = [
+  { label: '总排行', value: 'classic' },
+  { label: '热门榜', value: 'hot' },
+  { label: '新作榜', value: 'new' },
+  { label: '收藏榜', value: 'collection' },
+  { label: '推荐榜', value: 'recommend' },
+  { label: '完结榜', value: 'finished' },
+  { label: '飙升榜', value: 'rising' },
+] as const;
+const UNIFIED_RANKING_TYPES: ReadonlySet<string> = new Set(
+  RANKING_MODE_OPTIONS.filter((option) => option.value !== 'classic').map((option) => option.value)
+);
+const RANKING_TIME_OPTIONS = [
+  { label: '日排行', value: 0 },
+  { label: '周排行', value: 2 },
+  { label: '月排行', value: 4 },
+  { label: '总排行', value: 6 },
+] as const;
+const RANKING_TYPE_OPTIONS = [
+  { label: '人气排行', value: 0 },
+  { label: '吐槽排行', value: 2 },
+  { label: '订阅排行', value: 4 },
+] as const;
+const AUTO_SIGN_IN_RETRY_DELAY_MS = 60_000;
 
 let userAgentCache: string | null = null;
 let userAgentInitPromise: Promise<string> | null = null;
 let authTokenCache: string | null = null;
 let authTokenInitPromise: Promise<string> | null = null;
 let loginInFlight: Promise<string> | null = null;
+let clientIdCache: string | null = null;
+let clientIdInitPromise: Promise<string> | null = null;
+let autoSignInPromise: Promise<void> | null = null;
 let zmhInitStarted = false;
 
 function randomInt(min: number, max: number) {
@@ -231,7 +467,7 @@ async function getPersistedUserAgent() {
 
   userAgentInitPromise = (async () => {
     try {
-      const saved = String(await pluginConfig.load(USER_AGENT_CONFIG_KEY, '')).trim();
+      const saved = await loadAndNormalizeConfigString(USER_AGENT_CONFIG_KEY, '');
       if (saved) {
         userAgentCache = saved;
         return saved;
@@ -321,6 +557,17 @@ async function loadAuthPassword() {
   return await loadAndNormalizeConfigString(AUTH_PASSWORD_CONFIG_KEY, '');
 }
 
+async function loadLoginCredentials() {
+  const [configuredAccount, configuredPassword] = await Promise.all([
+    loadAuthAccount(),
+    loadAuthPassword(),
+  ]);
+  return {
+    account: configuredAccount,
+    password: configuredPassword,
+  };
+}
+
 async function loadAuthToken() {
   if (authTokenCache !== null) {
     return authTokenCache;
@@ -349,6 +596,45 @@ async function saveAuthToken(token: string) {
 async function md5Hex(input: string) {
   const hash = await bridge.call('crypto.md5_hex', input);
   return String(hash ?? '').trim();
+}
+
+async function getClientId() {
+  if (clientIdCache !== null) {
+    return clientIdCache;
+  }
+  if (clientIdInitPromise) {
+    return clientIdInitPromise;
+  }
+
+  clientIdInitPromise = (async () => {
+    const persisted = (await loadAndNormalizeConfigString(CLIENT_ID_CONFIG_KEY, '')).trim();
+    if (persisted) {
+      clientIdCache = persisted;
+      return persisted;
+    }
+
+    const seed = `${Date.now()}-${randomToken(32)}`;
+    let clientId = '';
+    try {
+      clientId = await md5Hex(seed);
+    } catch {
+      // 纯测试环境可能没有 crypto bridge，随机值仍能满足客户端标识要求。
+    }
+    clientId = clientId || `${Date.now()}${randomToken(24)}`;
+    clientIdCache = clientId;
+    try {
+      await saveConfigString(CLIENT_ID_CONFIG_KEY, clientId);
+    } catch {
+      // ignore client id persistence errors
+    }
+    return clientId;
+  })();
+
+  try {
+    return await clientIdInitPromise;
+  } finally {
+    clientIdInitPromise = null;
+  }
 }
 
 function requireCredentials(account: string, password: string) {
@@ -380,22 +666,24 @@ async function loginWithPassword(payload: LoginPayload = {}) {
     formData.append('username', account);
     formData.append('passwd', encryptedPwd);
 
-    const headers = await getDefaultHeaders({ includeAuth: false });
-    const response = await wretch('https://account-api.zaimanhua.com/v1/login/passwd')
-      .headers({
-        ...headers,
-        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-      })
-      .post(formData.toString())
-      .res();
-    if (!response.ok) {
+    let json;
+    try {
+      json = await zmhApi.requestAccountApi<Record<string, unknown>>('/login/passwd', {
+        method: 'POST',
+        body: formData.toString(),
+        includeAuth: false,
+        contentType: 'application/x-www-form-urlencoded;charset=utf-8',
+        checkErrno: false,
+        errorPrefix: '登录请求失败',
+      });
+    } catch (error) {
+      const message = getErrorMessage(error, '登录请求失败');
       flutterTools.showToast({
-        message: `登录请求失败(${response.status})`,
+        message,
         level: 'error',
       });
-      throw new Error(`登录请求失败(${response.status})`);
+      throw error;
     }
-    const json = (await response.json()) as ApiResponse<Record<string, unknown>>;
     if (json.errno !== 0) {
       flutterTools.showToast({
         message: json.errmsg || '登录失败',
@@ -420,6 +708,7 @@ async function loginWithPassword(payload: LoginPayload = {}) {
       ]);
     }
     await saveAuthToken(token);
+    schedulePostLoginTasks('login');
     return token;
   })();
 
@@ -439,7 +728,7 @@ async function loginWithPassword(payload: LoginPayload = {}) {
 }
 
 async function loginWithStoredCredentials(reason = 'unknown') {
-  const [account, password] = await Promise.all([loadAuthAccount(), loadAuthPassword()]);
+  const { account, password } = await loadLoginCredentials();
   try {
     return await loginWithPassword({
       account,
@@ -528,10 +817,16 @@ async function getDefaultHeaders(
     token?: string;
   } = {}
 ) {
-  const userAgent = await getPersistedUserAgent();
+  const [userAgent, clientId] = await Promise.all([getPersistedUserAgent(), getClientId()]);
   const headers: Record<string, string> = {
     'User-Agent': userAgent,
     Accept: 'application/json',
+    'Accept-Encoding': 'identity',
+    Platform: 'android',
+    'X-Client-ID': clientId,
+    AppVersion: APP_VERSION,
+    BuildNumber: APP_BUILD_NUMBER,
+    Channel: APP_CHANNEL,
   };
   if (options.includeAuth !== false) {
     const token = String(options.token ?? '').trim() || (await loadAuthToken());
@@ -542,26 +837,136 @@ async function getDefaultHeaders(
   return headers;
 }
 
-function getDefaultParams() {
-  return {
-    platform: 'android',
-    timestamp: String(Math.floor(Date.now() / 1000)),
-    _v: APP_VERSION,
-    _c: APP_CHANNEL,
-  };
+function getErrorMessage(error: unknown, fallback = '请求失败') {
+  const message = String((error as { message?: unknown } | null)?.message ?? '').trim();
+  return message || fallback;
 }
 
-function toTagNameList(values: unknown): string[] {
+function isAuthError(errno: unknown, errmsg: unknown) {
+  const code = Number(errno);
+  const message = String(errmsg ?? '').toLowerCase();
+  return (
+    [401, 403, 1001, 1002, 1003, 1004].includes(code) ||
+    /登录|令牌|token|授权|认证|未登录|过期|unauthorized|forbidden/.test(message)
+  );
+}
+
+async function ensureAuthenticated(reason: string) {
+  const currentToken = await loadAuthToken();
+  if (currentToken) {
+    return currentToken;
+  }
+
+  await loginWithStoredCredentials(reason);
+  const token = await loadAuthToken();
+  if (!token) {
+    throw new Error('登录成功但未保存 token');
+  }
+  return token;
+}
+
+const zmhApi = createApiClient({
+  getDefaultHeaders,
+  ensureAuthenticated,
+  loginWithStoredCredentials,
+  isAuthError,
+});
+
+function toDetailTagList(values: unknown): DetailApiTag[] {
   const list = Array.isArray(values) ? values : [];
   return list
     .map((item) => toStringMap(item))
-    .map((item) => String(item.tag_name ?? '').trim())
+    .map((item) => ({
+      tag_id: toNumber(item.tag_id, 0),
+      tag_name: String(item.tag_name ?? '').trim(),
+    }))
+    .filter((item) => item.tag_name);
+}
+
+function toTagNameList(values: unknown): string[] {
+  return toDetailTagList(values)
+    .map((item) => item.tag_name ?? '')
     .filter(Boolean);
+}
+
+function createDetailMetadataActionList(
+  type: string,
+  name: string,
+  tags: DetailApiTag[],
+  createOnTap: (tagName: string, tag: DetailApiTag) => Record<string, unknown>
+): MetadataListItem | null {
+  const value = tags
+    .map((tag) => {
+      const tagName = String(tag.tag_name ?? '').trim();
+      return tagName ? createActionItem(tagName, createOnTap(tagName, tag)) : null;
+    })
+    .filter((item): item is ReturnType<typeof createActionItem> => item !== null);
+
+  return value.length ? { type, name, value } : null;
+}
+
+function createCategoryMetadataAction(tagName: string, tag: DetailApiTag) {
+  const tagId = toNumber(tag.tag_id, 0);
+  if (!tagId) {
+    return {
+      type: 'openSearch',
+      payload: {
+        source: PLUGIN_ID,
+        keyword: tagName,
+      },
+    };
+  }
+
+  const categoryExtern = {
+    source: 'category',
+    theme: tagId,
+  };
+  return {
+    type: 'openComicList',
+    payload: {
+      scene: {
+        title: tagName,
+        source: PLUGIN_ID,
+        body: {
+          type: 'pluginPagedComicList',
+          request: {
+            fnPath: 'getCategoriesData',
+            core: {},
+            extern: categoryExtern,
+          },
+        },
+        filter: {
+          fnPath: 'getCategoryFilterBundle',
+          core: {},
+          extern: categoryExtern,
+        },
+      },
+    },
+  };
+}
+
+function createAuthorMetadataAction(tagName: string) {
+  return {
+    type: 'openSearch',
+    payload: {
+      source: PLUGIN_ID,
+      keyword: tagName,
+      extern: { mode: 'author' },
+    },
+  };
 }
 
 function splitTypeValues(value: unknown): string[] {
   return String(value ?? '')
     .split(/[/,，]/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function splitTextValues(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .flatMap((item) => String(item ?? '').split(/[/,，]/g))
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -572,6 +977,33 @@ function formatUnixSeconds(value: unknown): string {
     return '';
   }
   return new Date(seconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function formatApiDate(value: unknown): string {
+  const numeric = Number(value);
+  if (String(value ?? '').trim() && Number.isFinite(numeric) && numeric > 0) {
+    return formatUnixSeconds(numeric);
+  }
+
+  const text = String(value ?? '').trim();
+  if (!text) {
+    return '';
+  }
+
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp)
+    ? new Date(timestamp).toISOString().slice(0, 19).replace('T', ' ')
+    : text;
+}
+
+function toBoolean(value: unknown) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  return /^(1|true|yes|y|是)$/i.test(String(value ?? '').trim());
 }
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -588,31 +1020,75 @@ function createPagingInfo(page: number, pages: number, total: number) {
   };
 }
 
+function createSearchResultResponse(
+  payload: SearchPayload,
+  page: number,
+  items: SearchResultContract['items'],
+  total: number,
+  hasReachedMax?: boolean
+): SearchResultContract {
+  const pageCount = Math.max(1, Math.ceil(total / SEARCH_PAGE_SIZE));
+  const paging = {
+    ...createPagingInfo(page, pageCount, total),
+    ...(hasReachedMax === undefined ? {} : { hasReachedMax }),
+  };
+
+  return {
+    source: PLUGIN_ID,
+    extern: payload.extern ?? null,
+    scheme: {
+      version: '1.0.0',
+      type: 'searchResult',
+      source: PLUGIN_ID,
+      list: 'comicGrid',
+    },
+    data: {
+      paging,
+      items,
+    },
+    paging,
+    items,
+  };
+}
+
+async function fetchUnifiedSearchPage(keyword: string, page: number) {
+  const response = await zmhApi.fetchApiResponse<SearchApiData>('/search/unified', {
+    keyword,
+    type: 'comic',
+    page,
+    pageSize: SEARCH_PAGE_SIZE,
+  });
+  const data = toStringMap(getApiDataOrThrow(response, '搜索'));
+  const list = (Array.isArray(data.list) ? data.list : []) as SearchApiComic[];
+  return {
+    list,
+    total: toNumber(data.total, list.length),
+  };
+}
+
 function pickDetailComicId(item: SearchApiComic): string {
-  const comicId = toNumber(item.comic_id, 0);
-  if (comicId > 0) {
-    return String(comicId);
-  }
-  return String(item.id ?? '').trim();
+  const rawId = String(item.comic_id ?? item.id ?? '').trim();
+  const match = /^M_(\d+)$/i.exec(rawId);
+  return match?.[1] ?? rawId;
 }
 
 function mapSearchItemToComicGrid(item: SearchApiComic) {
   const comicId = pickDetailComicId(item);
   const title = String(item.title ?? '').trim() || `漫画 ${comicId}`;
-  const subtitle = [item.authors, item.status, item.last_update_chapter_name]
-    .map((value) => String(value ?? '').trim())
-    .filter(Boolean)
-    .join(' · ');
-  const coverUrl = String(item.cover ?? '').trim();
+  const authors = splitTextValues(item.authors);
   const statusText = String(item.status ?? '').trim();
+  const latestChapter = String(
+    item.lastUpdateChapterName ?? item.last_update_chapter_name ?? ''
+  ).trim();
+  const subtitle = [authors.join(' / '), statusText, latestChapter].filter(Boolean).join(' · ');
+  const coverUrl = String(item.coverUrl ?? item.cover ?? '').trim();
   const typeValues = splitTypeValues(item.types);
-  const authorValues = String(item.authors ?? '')
-    .split(/[/,，]/g)
-    .map((value) => value.trim())
-    .filter(Boolean);
   const path = `comic/${comicId}/cover.jpg`;
-  const updatedAt = formatUnixSeconds(item.last_updatetime);
-  const hotHits = toNumber(item.hot_hits, 0);
+  const updatedAt = formatApiDate(item.lastUpdatedAt ?? item.last_updatetime);
+  const hotHits = toNumber(
+    item.viewCount ?? item.subCount ?? item.favoriteCount ?? item.hot_hits,
+    0
+  );
 
   return {
     source: PLUGIN_ID,
@@ -620,9 +1096,69 @@ function mapSearchItemToComicGrid(item: SearchApiComic) {
     title,
     subtitle,
     finished: /完结|短篇/.test(statusText),
-    likesCount: hotHits,
-    viewsCount: hotHits,
+    likesCount: toNumber(item.favoriteCount ?? item.subCount, hotHits),
+    viewsCount: toNumber(item.viewCount, hotHits),
     updatedAt,
+    cover: {
+      id: comicId,
+      url: coverUrl || NOT_FOUND_IMAGE_URL,
+      path,
+      name: `${comicId}.jpg`,
+      extern: {
+        path,
+        comicPy: String(item.comic_py ?? '').trim(),
+      },
+    },
+    metadata: [
+      createBasicMetadata('author', '作者', authors),
+      createBasicMetadata('categories', '分类', typeValues),
+      createBasicMetadata('status', '状态', statusText ? [statusText] : []),
+      createBasicMetadata('latest', '更新', latestChapter ? [latestChapter] : []),
+      createBasicMetadata('works', '作品', []),
+      createBasicMetadata('actors', '角色', []),
+    ],
+    raw: item,
+    extern: {
+      comicId,
+      comicPy: String(item.comic_py ?? '').trim(),
+      lastUpdateChapterId: String(item.lastUpdateChapterId ?? '').trim(),
+    },
+  };
+}
+
+function pickCatalogComicId(item: CatalogApiComic) {
+  const comicId = String(item.comic_id ?? item.id ?? '').trim();
+  const match = /^M_(\d+)$/i.exec(comicId);
+  return match?.[1] ?? comicId;
+}
+
+function mapCatalogItemToComicGrid(item: CatalogApiComic) {
+  const comicId = pickCatalogComicId(item);
+  const title = String(item.title ?? item.name ?? '').trim() || `漫画 ${comicId}`;
+  const authorValues = splitTextValues(item.authors);
+  const typeValues = splitTypeValues(item.types);
+  const statusText = String(item.status ?? '').trim();
+  const latestChapter = String(item.last_update_chapter_name ?? item.chapter_name ?? '').trim();
+  const subtitle = [authorValues.join(' / '), statusText, latestChapter]
+    .filter(Boolean)
+    .join(' · ');
+  const coverUrl = String(item.cover ?? item.coverUrl ?? '').trim();
+  const path = `comic/${comicId}/cover.jpg`;
+  const hotHits = toNumber(
+    item.hotNum ?? item.hot_num ?? item.hot_hits ?? item.subCount ?? item.favoriteCount ?? item.num,
+    0
+  );
+  const views = toNumber(item.hit_num ?? item.viewCount ?? item.num, 0);
+
+  return {
+    source: PLUGIN_ID,
+    id: comicId,
+    title,
+    subtitle,
+    finished: /完结|已完结|短篇/.test(statusText),
+    likesCount: hotHits,
+    viewsCount: views,
+    updatedAt: formatApiDate(item.last_updatetime),
     cover: {
       id: comicId,
       url: coverUrl || NOT_FOUND_IMAGE_URL,
@@ -637,11 +1173,7 @@ function mapSearchItemToComicGrid(item: SearchApiComic) {
       createBasicMetadata('author', '作者', authorValues),
       createBasicMetadata('categories', '分类', typeValues),
       createBasicMetadata('status', '状态', statusText ? [statusText] : []),
-      createBasicMetadata(
-        'latest',
-        '更新',
-        item.last_update_chapter_name ? [item.last_update_chapter_name] : []
-      ),
+      createBasicMetadata('latest', '更新', latestChapter ? [latestChapter] : []),
       createBasicMetadata('works', '作品', []),
       createBasicMetadata('actors', '角色', []),
     ],
@@ -649,6 +1181,437 @@ function mapSearchItemToComicGrid(item: SearchApiComic) {
     extern: {
       comicId,
       comicPy: String(item.comic_py ?? '').trim(),
+      lastUpdateChapterId: String(item.last_update_chapter_id ?? '').trim(),
+      isSubscribed: toBoolean(item.is_sub),
+    },
+  };
+}
+
+function createComicPagedListResponse(
+  payload: BasePayload,
+  items: ComicPagedListContract['data']['items'],
+  hasReachedMax: boolean,
+  type: string
+): ComicPagedListContract {
+  return {
+    source: PLUGIN_ID,
+    extern: payload.extern ?? null,
+    scheme: {
+      version: '1.0.0',
+      type,
+      card: 'comic',
+    },
+    data: {
+      items,
+      hasReachedMax,
+    },
+  };
+}
+
+function getApiDataOrThrow<T>(response: ApiResponse<T>, operation: string) {
+  const errno = Number(response.errno);
+  if (
+    response.errno !== undefined &&
+    response.errno !== null &&
+    Number.isFinite(errno) &&
+    errno !== 0
+  ) {
+    throw new Error(response.errmsg || `${operation}失败(${response.errno})`);
+  }
+  return response.data;
+}
+
+function getCategoryFilterValues(tagType: number, tagId: number) {
+  switch (tagType) {
+    case 4:
+      return { zone: tagId };
+    case 5:
+      return { status: tagId };
+    case 6:
+      return { cate: tagId };
+    case 1:
+    default:
+      return { theme: tagId };
+  }
+}
+
+function buildFunctionActionGridPage(
+  title: string,
+  items: FunctionPageActionGridItem[]
+): FunctionPageContract {
+  return {
+    source: PLUGIN_ID,
+    scheme: {
+      version: '1.0.0',
+      type: 'page',
+      title,
+      body: {
+        type: 'list',
+        children: [{ type: 'action-grid', key: 'items' }],
+      },
+    },
+    data: {
+      items,
+      hasReachedMax: true,
+    },
+  };
+}
+
+function buildCategoriesFunctionPage(items: FunctionPageActionGridItem[]): FunctionPageContract {
+  return buildFunctionActionGridPage('分类', items);
+}
+
+async function getFunctionPage(payload: FunctionPagePayload = {}): Promise<FunctionPageContract> {
+  const extern = toStringMap(payload.extern);
+  const id = String(payload.id ?? extern.id ?? 'categories').trim();
+
+  if (id !== 'categories') {
+    throw new Error(`不支持的功能页面：${id || '未指定'}`);
+  }
+
+  const response = await zmhApi.fetchApiResponse<CategoryEntryApiData>('/comic/filter/category', {
+    source: 1,
+  });
+  const data = getApiDataOrThrow(response, '加载分类入口');
+  const categoryList = Array.isArray(data?.cateList) ? data.cateList : [];
+  const items = categoryList
+    .map((category): FunctionPageActionGridItem | null => {
+      const tagId = toNumber(category.tagId, 0);
+      const tagType = toNumber(category.tagType, 1);
+      const title = String(category.title ?? '').trim();
+      if (!tagId || !title) {
+        return null;
+      }
+
+      const coverUrl = String(category.cover ?? '').trim();
+      const categoryFilter = getCategoryFilterValues(tagType, tagId);
+      const requestExtern = {
+        source: 'category',
+        ...categoryFilter,
+      };
+
+      return {
+        title,
+        cover: {
+          url: coverUrl || NOT_FOUND_IMAGE_URL,
+          path: coverUrl ? `category/${tagId}.jpg` : PLACEHOLDER_IMAGE_PATH,
+          extern: {
+            tagId,
+            tagType,
+          },
+        },
+        action: {
+          type: 'openComicList',
+          payload: {
+            scene: {
+              title,
+              source: PLUGIN_ID,
+              body: {
+                type: 'pluginPagedComicList',
+                request: {
+                  fnPath: 'getCategoriesData',
+                  core: {},
+                  extern: requestExtern,
+                },
+              },
+              filter: {
+                fnPath: 'getCategoryFilterBundle',
+                core: {},
+                extern: requestExtern,
+              },
+            },
+          },
+        },
+        raw: category,
+      };
+    })
+    .filter((item): item is FunctionPageActionGridItem => item !== null);
+
+  return buildCategoriesFunctionPage(items);
+}
+
+async function getUpdatesData(payload: UpdatePayload = {}): Promise<ComicPagedListContract> {
+  const extern = toStringMap(payload.extern);
+  const page = Math.max(1, toNumber(payload.page ?? extern.page, 1));
+  const size = Math.max(
+    1,
+    Math.min(UPDATE_PAGE_SIZE, toNumber(payload.size ?? extern.size, UPDATE_PAGE_SIZE))
+  );
+  const response = await zmhApi.fetchApiResponse<CatalogApiComic[]>(
+    `/comic/update/list/${size}/${page}`
+  );
+  const list = getApiDataOrThrow(response, '加载更新列表');
+  const items = (Array.isArray(list) ? list : [])
+    .map((item) => mapCatalogItemToComicGrid(item))
+    .filter((item) => item.id);
+
+  return createComicPagedListResponse(payload, items, items.length < size, 'comicUpdateFeed');
+}
+
+async function getCategoriesData(payload: CategoryPayload = {}): Promise<ComicPagedListContract> {
+  const extern = toStringMap(payload.extern);
+  const page = Math.max(1, toNumber(payload.page ?? extern.page, 1));
+  const sortType = toNumber(payload.sortType ?? payload.sort ?? extern.sortType ?? extern.sort, 2);
+  const theme = toNumber(payload.theme ?? extern.theme, 0);
+  const cate = toNumber(payload.cate ?? extern.cate, 0);
+  const status = toNumber(payload.status ?? extern.status, 0);
+  const zone = toNumber(payload.zone ?? extern.zone, 0);
+  const response = await zmhApi.fetchApiResponse<CategoryApiData>('/comic/filter/list', {
+    page,
+    sortType,
+    theme,
+    cate,
+    status,
+    zone,
+  });
+  const data = toStringMap(getApiDataOrThrow(response, '加载分类列表'));
+  const list = (Array.isArray(data.comicList) ? data.comicList : []) as CatalogApiComic[];
+  const items = list.map((item) => mapCatalogItemToComicGrid(item)).filter((item) => item.id);
+  const total = toNumber(data.totalNum, 0);
+  const hasReachedMax =
+    items.length < CATEGORY_PAGE_SIZE || (total > 0 && page * CATEGORY_PAGE_SIZE >= total);
+
+  return createComicPagedListResponse(payload, items, hasReachedMax, 'comicCategoryFeed');
+}
+
+function createCoreChoiceField(
+  key: string,
+  label: string,
+  options: Array<{ label: string; value: number | string }>
+) {
+  return {
+    key,
+    kind: 'choice' as const,
+    label,
+    options: options.map((option) => ({
+      label: option.label,
+      value: option.value,
+      result: {
+        core: { [key]: option.value },
+        // 兼容仍只读取 extern 的旧宿主版本；当前宿主会优先使用 core。
+        extern: { [key]: option.value },
+      },
+    })),
+  };
+}
+
+function mapClassifyOptions(options: ClassifyApiOption[] | undefined) {
+  const seen = new Set<number>();
+  return (Array.isArray(options) ? options : [])
+    .map((option) => ({
+      label: String(option.tagName ?? '').trim(),
+      value: toNumber(option.tagId, 0),
+    }))
+    .filter((option) => {
+      if (!option.label || seen.has(option.value)) {
+        return false;
+      }
+      seen.add(option.value);
+      return true;
+    });
+}
+
+function schedulePostLoginTasks(reason: string) {
+  console.info(`[zmh.login] schedule background tasks (${reason})`);
+  void runAutoSignInUntilSuccess().catch((error) => {
+    console.warn('[zmh.signIn] background task stopped', error);
+  });
+}
+
+async function getCategoryFilterBundle(payload: BasePayload = {}): Promise<FilterBundleContract> {
+  const extern = toStringMap(payload.extern);
+  const fieldKeyByTitle: Record<string, string> = {
+    题材: 'theme',
+    读者群: 'cate',
+    进度: 'status',
+    地域: 'zone',
+  };
+  const fields: FilterBundleContract['scheme']['fields'] = [
+    createCoreChoiceField('sortType', '排序', [
+      { label: '更新时间', value: 1 },
+      { label: '人气', value: 2 },
+    ]),
+  ];
+  const defaultOptions = [{ label: '全部', value: 0 }];
+
+  try {
+    const response = await zmhApi.fetchApiResponse<ClassifyApiData>('/comic/filter/classify');
+    const data = getApiDataOrThrow(response, '加载分类筛选');
+    const groups = Array.isArray(data?.classifyList) ? data.classifyList : [];
+    for (const group of groups) {
+      const title = String(group.title ?? '').trim();
+      const key = fieldKeyByTitle[title];
+      if (!key) {
+        continue;
+      }
+      const options = mapClassifyOptions(group.list);
+      fields.push(createCoreChoiceField(key, title, options.length ? options : defaultOptions));
+    }
+  } catch (error) {
+    console.warn('[zmh.category] load filter failed', getErrorMessage(error));
+  }
+
+  for (const [title, key] of Object.entries(fieldKeyByTitle)) {
+    if (!fields.some((field) => field.key === key)) {
+      fields.push(createCoreChoiceField(key, title, defaultOptions));
+    }
+  }
+
+  return {
+    source: PLUGIN_ID,
+    scheme: {
+      version: '1.0.0',
+      type: 'comicCategoryFilter',
+      title: '分类筛选',
+      fields,
+    },
+    data: {
+      values: {
+        sortType: toNumber(extern.sortType ?? extern.sort, 2),
+        theme: toNumber(extern.theme, 0),
+        cate: toNumber(extern.cate, 0),
+        status: toNumber(extern.status, 0),
+        zone: toNumber(extern.zone, 0),
+      },
+    },
+  };
+}
+
+async function fetchUnifiedRanking(rankingType: string, page: number) {
+  const response = await zmhApi.fetchApiResponse<UnifiedRankingApiData>('/search/rankings', {
+    rankingType,
+    type: 'comic',
+    page,
+    pageSize: UNIFIED_RANKING_PAGE_SIZE,
+  });
+  const data = toStringMap(getApiDataOrThrow(response, '加载新版排行榜'));
+  const list = (Array.isArray(data.list) ? data.list : []) as CatalogApiComic[];
+  return {
+    list,
+    total: toNumber(data.total, list.length),
+  };
+}
+
+function createRankingFeedResponse(
+  payload: RankingPayload,
+  list: CatalogApiComic[],
+  page: number,
+  pageSize: number,
+  total: number | null = null
+) {
+  const items = list.map((item) => mapCatalogItemToComicGrid(item)).filter((item) => item.id);
+  const hasReachedMax =
+    items.length < pageSize || (total !== null && total > 0 && page * pageSize >= total);
+  return createComicPagedListResponse(payload, items, hasReachedMax, 'comicRankingFeed');
+}
+
+async function getRankingData(payload: RankingPayload = {}): Promise<ComicPagedListContract> {
+  const extern = toStringMap(payload.extern);
+  const core = toStringMap(payload.core);
+  const params = toStringMap(payload.params);
+  const page = Math.max(1, toNumber(payload.page ?? core.page ?? params.page ?? extern.page, 1));
+  const unifiedRankingType = String(
+    payload.rankingType ?? core.rankingType ?? params.rankingType ?? extern.rankingType ?? ''
+  ).trim();
+
+  if (UNIFIED_RANKING_TYPES.has(unifiedRankingType)) {
+    const unified = await fetchUnifiedRanking(unifiedRankingType, page);
+    return createRankingFeedResponse(
+      payload,
+      unified.list,
+      page,
+      UNIFIED_RANKING_PAGE_SIZE,
+      unified.total
+    );
+  }
+
+  const tagId = toNumber(payload.tagId ?? core.tagId ?? params.tagId ?? extern.tagId, 0);
+  const byTime = toNumber(payload.byTime ?? core.byTime ?? params.byTime ?? extern.byTime, 0);
+  const rankType = toNumber(
+    payload.rankType ?? core.rankType ?? params.rankType ?? extern.rankType,
+    0
+  );
+
+  // 经典订阅排行在当前服务端经常返回 data:null，新版收藏榜可以完整返回并支持分页。
+  if (rankType === 4) {
+    try {
+      const unified = await fetchUnifiedRanking('collection', page);
+      if (unified.list.length > 0 || unified.total > 0) {
+        console.info('[zmh.ranking] use unified collection ranking');
+        return createRankingFeedResponse(
+          payload,
+          unified.list,
+          page,
+          UNIFIED_RANKING_PAGE_SIZE,
+          unified.total
+        );
+      }
+    } catch (error) {
+      console.warn('[zmh.ranking] unified collection ranking failed', getErrorMessage(error));
+    }
+  }
+
+  const response = await zmhApi.fetchApiResponse<CatalogApiComic[]>('/comic/rank/list', {
+    tag_id: tagId,
+    by_time: byTime,
+    rank_type: rankType,
+    page,
+  });
+  const primaryData = getApiDataOrThrow(response, '加载排行榜');
+  const list = Array.isArray(primaryData) ? primaryData : [];
+  return createRankingFeedResponse(payload, list, page, CLASSIC_RANKING_PAGE_SIZE);
+}
+
+async function getRankingFilterBundle(payload: BasePayload = {}): Promise<FilterBundleContract> {
+  const extern = toStringMap(payload.extern);
+  const core = toStringMap(payload.core);
+  const params = toStringMap(payload.params);
+  let tagOptions = [{ label: '全部', value: 0 }];
+  try {
+    const response = await zmhApi.fetchApiResponse<RankTypeApiData>('/comic/rank/type_filter');
+    const data = getApiDataOrThrow(response, '加载排行榜分类');
+    const seen = new Set<number>();
+    const remoteOptions = (Array.isArray(data?.list) ? data.list : [])
+      .map((option) => ({
+        label: String(option.tag_name ?? '').trim(),
+        value: toNumber(option.tag_id, 0),
+      }))
+      .filter((option) => {
+        if (!option.label || seen.has(option.value)) {
+          return false;
+        }
+        seen.add(option.value);
+        return true;
+      });
+    if (remoteOptions.length) {
+      tagOptions = remoteOptions;
+    }
+  } catch (error) {
+    console.warn('[zmh.ranking] load filter failed', getErrorMessage(error));
+  }
+
+  return {
+    source: PLUGIN_ID,
+    scheme: {
+      version: '1.0.0',
+      type: 'comicRankingFilter',
+      title: '排行榜筛选',
+      fields: [
+        createCoreChoiceField('rankingType', '排行榜版本', [...RANKING_MODE_OPTIONS]),
+        createCoreChoiceField('byTime', '排行时间', [...RANKING_TIME_OPTIONS]),
+        createCoreChoiceField('rankType', '榜单类型', [...RANKING_TYPE_OPTIONS]),
+        createCoreChoiceField('tagId', '分类', tagOptions),
+      ],
+    },
+    data: {
+      values: {
+        rankingType: String(
+          core.rankingType ?? params.rankingType ?? extern.rankingType ?? 'classic'
+        ),
+        byTime: toNumber(core.byTime ?? params.byTime ?? extern.byTime, 0),
+        rankType: toNumber(core.rankType ?? params.rankType ?? extern.rankType, 0),
+        tagId: toNumber(core.tagId ?? params.tagId ?? extern.tagId, 0),
+      },
     },
   };
 }
@@ -661,13 +1624,446 @@ function buildTitleMeta(input: { statusText: string; updateText: string; chapter
   ];
 }
 
-async function fetchJsonOrThrow<T>(url: string) {
-  const headers = await getDefaultHeaders();
-  const res = await wretch(url).headers(headers).get().res();
-  if (!res.ok) {
-    throw new Error(`请求失败(${res.status})`);
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function getTodaySignInStatus() {
+  const response = await zmhApi.fetchAccountApi<TaskListApiData>('/task/list');
+  const data = toStringMap(response.data);
+  const signInfo = toStringMap(toStringMap(data.task).signInfo);
+  const value = signInfo.current_sign ?? signInfo.currentSign;
+  if (value === undefined || value === null) {
+    throw new Error('签到状态响应缺少 current_sign');
   }
-  return (await res.json()) as T;
+  return toBoolean(value);
+}
+
+async function executeSignInTask() {
+  await zmhApi.fetchAccountApi<Record<string, unknown>>('/task/sign_in', 'POST');
+}
+
+async function notifyAutoSignInSuccess() {
+  try {
+    await flutterTools.showToast({
+      message: '再漫画自动签到成功',
+      level: 'success',
+    });
+  } catch (error) {
+    console.warn('[zmh.signIn] success notification failed', error);
+  }
+}
+
+async function runAutoSignInUntilSuccess() {
+  if (autoSignInPromise) {
+    return autoSignInPromise;
+  }
+
+  const task = (async () => {
+    while (true) {
+      try {
+        const signedIn = await getTodaySignInStatus();
+        if (signedIn) {
+          await notifyAutoSignInSuccess();
+          return;
+        }
+
+        await executeSignInTask();
+        const confirmed = await getTodaySignInStatus();
+        if (!confirmed) {
+          throw new Error('签到请求成功但服务端状态未确认');
+        }
+        await notifyAutoSignInSuccess();
+        console.info('[zmh.signIn] automatic sign-in success');
+        return;
+      } catch (error) {
+        console.warn(`[zmh.signIn] failed, retry in ${AUTO_SIGN_IN_RETRY_DELAY_MS}ms`, error);
+        await delay(AUTO_SIGN_IN_RETRY_DELAY_MS);
+      }
+    }
+  })();
+
+  autoSignInPromise = task;
+  try {
+    await task;
+  } finally {
+    if (autoSignInPromise === task) {
+      autoSignInPromise = null;
+    }
+  }
+}
+
+async function checkSubscribeStatus(comicId: string) {
+  const response = await zmhApi.fetchAuthenticatedApiResponse<Record<string, unknown>>(
+    '/comic/sub/checkIsSub',
+    {
+      source: COMIC_SOURCE,
+      objId: comicId,
+    },
+    'favorite.check'
+  );
+  return toBoolean(toStringMap(response.data).isSub);
+}
+
+async function getSubscribeStatusSafely(comicId: string) {
+  try {
+    const [account, password, token] = await Promise.all([
+      loadAuthAccount(),
+      loadAuthPassword(),
+      loadAuthToken(),
+    ]);
+    if (!token && (!account || !password.trim())) {
+      return false;
+    }
+    return await checkSubscribeStatus(comicId);
+  } catch (error) {
+    console.warn('[zmh.favorite] check status failed', {
+      comicId,
+      message: getErrorMessage(error),
+    });
+    return false;
+  }
+}
+
+async function requestSubscribeChange(comicId: string, subscribed: boolean) {
+  await zmhApi.fetchAuthenticatedApiResponse<Record<string, unknown>>(
+    subscribed ? '/comic/sub/add' : '/comic/sub/del',
+    { comic_id: comicId },
+    subscribed ? 'favorite.add' : 'favorite.remove'
+  );
+}
+
+async function setSubscribeStatus(comicId: string, subscribed: boolean) {
+  const before = await checkSubscribeStatus(comicId);
+  if (before === subscribed) {
+    return {
+      favorited: before,
+      committed: false,
+    };
+  }
+
+  await requestSubscribeChange(comicId, subscribed);
+  const after = await checkSubscribeStatus(comicId);
+  return {
+    favorited: after,
+    committed: true,
+  };
+}
+
+function getSubscriptionResponseList(data: unknown): unknown[] {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  const map = toStringMap(data);
+  return Array.isArray(map.subList) ? map.subList : [];
+}
+
+function mapBookshelfContentItem(item: Record<string, unknown>) {
+  const rawId = String(item.id ?? item.comicId ?? item.comic_id ?? '').trim();
+  const contentType = String(item.contentType ?? item.content_type ?? item.type ?? '').trim();
+  if (!rawId || /^N_/i.test(rawId) || /小说|novel/i.test(contentType)) {
+    return null;
+  }
+
+  const normalized: CatalogApiComic = {
+    comic_id: rawId,
+    title: String(item.title ?? item.name ?? '').trim(),
+    cover: String(
+      item.coverUrl ??
+        item.cover ??
+        item.cover_url ??
+        (Array.isArray(item.coverUrls) ? item.coverUrls[0] : item.cover_urls) ??
+        ''
+    ).trim(),
+    authors: item.authors as string | string[] | undefined,
+    status: String(item.status ?? '').trim(),
+    types: item.types as string | string[] | undefined,
+    last_update_chapter_id: (item.lastUpdateChapterId ?? item.last_update_chapter_id) as
+      | number
+      | string
+      | undefined,
+    last_update_chapter_name: String(
+      item.lastUpdateChapterName ?? item.last_update_chapter_name ?? ''
+    ).trim(),
+    last_updatetime: (item.lastUpdatedAt ?? item.last_updatetime) as number | string | undefined,
+    hot_num: toNumber(item.hotNum ?? item.hot_num ?? item.subscribeNum, 0),
+    hit_num: toNumber(item.hitNum ?? item.hit_num, 0),
+    comic_py: String(item.comicPy ?? item.comic_py ?? '').trim(),
+    is_sub: (item.isSubscribed ?? item.is_sub) as boolean | number | string | undefined,
+  };
+  const mapped = mapCatalogItemToComicGrid(normalized);
+  return {
+    ...mapped,
+    raw: item,
+    extern: {
+      ...mapped.extern,
+      contentType: contentType || 'comic',
+      bookshelf: true,
+    },
+  };
+}
+
+function mapBookshelfContentList(list: unknown[]) {
+  const seen = new Set<string>();
+  const rawItems = list.flatMap((value) => {
+    const group = toStringMap(value);
+    const singleItem = group.singleItem ?? group.single_item;
+    if (singleItem && typeof singleItem === 'object' && !Array.isArray(singleItem)) {
+      return [toStringMap(singleItem)];
+    }
+
+    const collectionItems = group.collectionItems ?? group.collection_items;
+    if (Array.isArray(collectionItems)) {
+      return collectionItems.map((item) => toStringMap(item));
+    }
+
+    return [group];
+  });
+
+  return rawItems
+    .map((item) => mapBookshelfContentItem(item))
+    .filter((item): item is NonNullable<ReturnType<typeof mapBookshelfContentItem>> => {
+      if (!item?.id || seen.has(item.id)) {
+        return false;
+      }
+      seen.add(item.id);
+      return true;
+    });
+}
+
+function getBookshelfHasReachedMax(
+  data: Record<string, unknown>,
+  page: number,
+  pageSize: number,
+  rawItemCount: number
+) {
+  if (data.hasNext !== undefined || data.hasMore !== undefined) {
+    return !toBoolean(data.hasNext ?? data.hasMore);
+  }
+
+  const pageCount = toNumber(data.pageCount ?? data.pages, 0);
+  if (pageCount > 0) {
+    return page >= pageCount;
+  }
+
+  const total = toNumber(data.total ?? data.totalNum, 0);
+  if (total > 0) {
+    return page * pageSize >= total;
+  }
+
+  return rawItemCount < pageSize;
+}
+
+async function getSubscriptionsData(
+  payload: BookshelfPayload = {}
+): Promise<ComicPagedListContract> {
+  const extern = toStringMap(payload.extern);
+  const page = Math.max(1, toNumber(payload.page ?? extern.page, 1));
+  const pageSize = Math.max(
+    1,
+    Math.min(
+      BOOKSHELF_DEFAULT_PAGE_SIZE,
+      toNumber(payload.size ?? extern.size, BOOKSHELF_DEFAULT_PAGE_SIZE)
+    )
+  );
+  const response = await zmhApi.fetchAuthenticatedApiResponse<BookshelfListApiData>(
+    '/comic/sub/list',
+    { page, size: pageSize },
+    'subscriptions.list'
+  );
+  const data = toStringMap(response.data);
+  const list = getSubscriptionResponseList(response.data);
+  const items = mapBookshelfContentList(list);
+
+  return createComicPagedListResponse(
+    payload,
+    items,
+    getBookshelfHasReachedMax(data, page, pageSize, list.length),
+    'comicSubscriptionsFeed'
+  );
+}
+
+function getCommentApiItems(data: CommentApiData) {
+  const rawList = data.commentList;
+  if (Array.isArray(rawList)) {
+    return rawList;
+  }
+
+  const commentMap = toStringMap(rawList);
+  const orderedIds = Array.isArray(data.commentIdList)
+    ? data.commentIdList.map((id) => String(id ?? '').trim()).filter(Boolean)
+    : [];
+  const orderedItems = orderedIds
+    .map((id) => toStringMap(commentMap[id]) as CommentApiItem)
+    .filter((item) => Object.keys(item).length > 0);
+  if (orderedItems.length) {
+    return orderedItems;
+  }
+
+  return Object.values(commentMap).map((item) => toStringMap(item) as CommentApiItem);
+}
+
+function mapCommentApiItem(item: CommentApiItem, comicId: string, fallbackId = ''): CommentItem {
+  const author = toStringMap(item.author);
+  const id = String(item.id ?? fallbackId).trim();
+  const uid = String(item.sender_uid ?? author.uid ?? '').trim();
+  const nickname = String(item.nickname ?? author.nickname ?? '').trim() || '匿名用户';
+  const photo = String(item.photo ?? author.photo ?? '').trim();
+  const nestedReplies = Array.isArray(item.replyList)
+    ? item.replyList
+    : Array.isArray(item.replies)
+      ? item.replies
+      : [];
+  const replies = nestedReplies
+    .map((reply, index) =>
+      mapCommentApiItem(toStringMap(reply) as CommentApiItem, comicId, `${id}-reply-${index + 1}`)
+    )
+    .filter((reply) => reply.id);
+  const stats = toStringMap(item.stats);
+
+  return {
+    id,
+    author: {
+      name: nickname,
+      avatar: {
+        url: photo,
+        path: photo ? `avatar/${uid || id}.jpg` : '',
+      },
+    },
+    content: String(item.content ?? '').trim(),
+    createdAt: formatApiDate(item.create_time),
+    replyCount: toNumber(item.reply_amount ?? stats.reply_amount, replies.length),
+    replies,
+    extern: {
+      comicId,
+      commentId: id,
+      userId: uid,
+      topStatus: toNumber(item.topStatus, 0),
+    },
+  };
+}
+
+async function getCommentFeed(payload: CommentFeedPayload = {}): Promise<CommentFeedContract> {
+  const extern = toStringMap(payload.extern);
+  const comicId = String(payload.comicId ?? extern.comicId ?? '').trim();
+  if (!comicId) {
+    throw new Error('comicId 不能为空');
+  }
+
+  const page = Math.max(1, toNumber(payload.page ?? extern.page, 1));
+  const size = Math.max(1, Math.min(100, toNumber(extern.pageSize, COMMENT_PAGE_SIZE)));
+  const sortBy = toNumber(extern.sortBy, 1);
+  const response = await zmhApi.fetchApiResponse<CommentApiData>('/comment/list', {
+    page,
+    size,
+    type: 4,
+    objId: comicId,
+    sortBy,
+  });
+  const data = getApiDataOrThrow(response, '加载评论');
+  const mappedItems = getCommentApiItems(data ?? {}).map((item, index) =>
+    mapCommentApiItem(item, comicId, `comment-${page}-${index + 1}`)
+  );
+  const topItems = mappedItems.filter((item) => toBoolean(item.extern.topStatus));
+  const items = mappedItems.filter((item) => !toBoolean(item.extern.topStatus));
+  const total = toNumber(data?.total, 0);
+
+  return {
+    source: PLUGIN_ID,
+    extern: payload.extern ?? null,
+    scheme: {
+      version: '1.0.0',
+      type: 'commentFeed',
+    },
+    data: {
+      topItems,
+      items,
+      paging: {
+        hasReachedMax: total > 0 ? page * size >= total : mappedItems.length < size,
+      },
+      replyMode: 'lazy',
+      canComment: {
+        comic: false,
+        reply: false,
+      },
+    },
+  };
+}
+
+async function getCommentCount(comicId: string) {
+  const response = await zmhApi.fetchApiResponse<CommentApiData>('/comment/list', {
+    page: 1,
+    size: 1,
+    type: 4,
+    objId: comicId,
+    sortBy: 1,
+  });
+  const data = getApiDataOrThrow(response, '加载评论数量');
+  return toNumber(data?.total, 0);
+}
+
+async function startFavoriteAction(
+  payload: FavoriteWorkflowStartPayload
+): Promise<FavoriteWorkflowResult> {
+  const comicId = String(payload.comicId ?? '').trim();
+  if (!comicId) {
+    return {
+      status: 'failed',
+      committed: false,
+      message: 'comicId 不能为空',
+      errorCode: 'INVALID_COMIC_ID',
+    };
+  }
+
+  if (payload.action !== 'add' && payload.action !== 'removeAll') {
+    return {
+      status: 'failed',
+      committed: false,
+      message: '再漫画仅支持添加或取消追更',
+      errorCode: 'UNSUPPORTED_ACTION',
+    };
+  }
+
+  const result = await setSubscribeStatus(comicId, payload.action === 'add');
+  return {
+    status: 'completed',
+    favorited: result.favorited,
+    committed: result.committed,
+  };
+}
+
+async function continueFavoriteAction(
+  _payload: FavoriteWorkflowContinuePayload
+): Promise<FavoriteWorkflowResult> {
+  return {
+    status: 'failed',
+    committed: false,
+    message: '该追更操作不需要继续',
+    errorCode: 'INVALID_CONTINUATION_TOKEN',
+  };
+}
+
+async function toggleFavorite(payload: ToggleFavoritePayload = {}): Promise<ToggleFavoriteResult> {
+  const comicId = String(payload.comicId ?? '').trim();
+  if (!comicId) {
+    throw new Error('comicId 不能为空');
+  }
+
+  const current = await checkSubscribeStatus(comicId);
+  const result = await startFavoriteAction({
+    comicId,
+    action: current ? 'removeAll' : 'add',
+    currentFavorite: payload.currentFavorite,
+    extern: payload.extern,
+  });
+  if (result.status !== 'completed') {
+    throw new Error(result.message || '追更操作失败');
+  }
+  return {
+    favorited: Boolean(result.favorited),
+    nextStep: 'none',
+  };
 }
 
 function pickChapterFromEps(
@@ -711,9 +2107,9 @@ function extractImageName(imageUrl: string, index: number) {
 }
 
 async function getChapterData(comicId: string, chapterId: string, retryAfterLogin = true) {
-  const params = new URLSearchParams(getDefaultParams());
-  const apiUrl = `${API_BASE}/comic/chapter/${encodeURIComponent(comicId)}/${encodeURIComponent(chapterId)}?${params.toString()}`;
-  const response = await fetchJsonOrThrow<ApiResponse<ChapterApiData>>(apiUrl);
+  const path = `/comic/chapter/${encodeURIComponent(comicId)}/${encodeURIComponent(chapterId)}`;
+  const apiUrl = zmhApi.buildApiUrl(path);
+  const response = await zmhApi.fetchApiResponse<ChapterApiData>(path);
   if (response.errno !== 0) {
     console.error('[zmh] chapter api failed', {
       apiUrl,
@@ -775,47 +2171,16 @@ async function getInfo(): Promise<InfoContract> {
 
 async function searchComic(payload: SearchPayload = {}): Promise<SearchResultContract> {
   const extern = toStringMap(payload.extern);
-  const page = Math.max(1, Number(payload.page ?? 1) || 1);
+  const page = Math.max(1, toNumber(payload.page, 1));
   const keyword = String(payload.keyword ?? extern.keyword ?? '').trim();
   if (!keyword) {
     throw new Error('keyword 不能为空');
   }
-  const params = new URLSearchParams({
-    keyword,
-    page: String(page),
-    sort: '0',
-    size: '20',
-    ...getDefaultParams(),
-  });
-  const apiUrl = `${API_BASE}/search/index?${params.toString()}`;
-  const response = await fetchJsonOrThrow<ApiResponse<SearchApiData>>(apiUrl);
-  if (response.errno !== 0) {
-    throw new Error(response.errmsg || '搜索失败');
-  }
-  const apiData = toStringMap(response.data);
-  const list = (Array.isArray(apiData.list) ? apiData.list : []) as SearchApiComic[];
-  const items = list.map((item) => mapSearchItemToComicGrid(item)).filter((item) => item.id);
-  const total = toNumber(apiData.total, items.length);
-  const pageSize = Math.max(1, toNumber(apiData.size, 20));
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const paging = createPagingInfo(page, pageCount, total);
 
-  return {
-    source: PLUGIN_ID,
-    extern: payload.extern ?? null,
-    scheme: {
-      version: '1.0.0',
-      type: 'searchResult',
-      source: PLUGIN_ID,
-      list: 'comicGrid',
-    },
-    data: {
-      paging,
-      items,
-    },
-    paging,
-    items,
-  };
+  const result = await fetchUnifiedSearchPage(keyword, page);
+  const items = result.list.map((item) => mapSearchItemToComicGrid(item)).filter((item) => item.id);
+  const total = result.total;
+  return createSearchResultResponse(payload, page, items, total);
 }
 
 async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDetailContract> {
@@ -823,9 +2188,8 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
   if (!comicId) {
     throw new Error('comicId 不能为空');
   }
-  const params = new URLSearchParams(getDefaultParams());
-  const detailUrl = `${API_BASE}/comic/detail/${encodeURIComponent(comicId)}?${params.toString()}`;
-  const response = await fetchJsonOrThrow<ApiResponse<Record<string, unknown>>>(detailUrl);
+  const path = `/comic/detail/${encodeURIComponent(comicId)}`;
+  const response = await zmhApi.fetchApiResponse<Record<string, unknown>>(path);
   if (response.errno !== 0) {
     throw new Error(response.errmsg || '加载漫画详情失败');
   }
@@ -833,9 +2197,13 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
   const rootData = toStringMap(response.data);
   const dataNode = toStringMap(rootData.data);
   const detail = dataNode as DetailApiComicInfo;
-  const authorNames = toTagNameList(detail.authors);
+  const [isFavourite, totalComments] = await Promise.all([
+    getSubscribeStatusSafely(comicId),
+    getCommentCount(comicId).catch(() => 0),
+  ]);
+  const authorTags = toDetailTagList(detail.authors);
+  const typeTags = toDetailTagList(detail.types);
   const statusNames = toTagNameList(detail.status);
-  const typeNames = toTagNameList(detail.types);
   const chapterGroups = (
     Array.isArray(detail.chapters) ? detail.chapters : []
   ) as DetailApiChapterGroup[];
@@ -906,8 +2274,10 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
         extern: { comicPy },
       }),
       metadata: [
-        createMetadataActionList('types', '分类', typeNames),
-        createMetadataActionList('authors', '作者', authorNames),
+        createDetailMetadataActionList('types', '分类', typeTags, createCategoryMetadataAction),
+        createDetailMetadataActionList('authors', '作者', authorTags, (tagName) =>
+          createAuthorMetadataAction(tagName)
+        ),
       ].filter((item): item is MetadataListItem => item != null),
       extern: {
         comicPy,
@@ -917,12 +2287,12 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
     recommend: [],
     totalViews: toNumber(detail.hit_num, 0),
     totalLikes: toNumber(detail.hot_num, 0),
-    totalComments: 0,
-    isFavourite: false,
+    totalComments,
+    isFavourite,
     isLiked: false,
-    allowComments: false,
+    allowComments: true,
     allowLike: false,
-    allowCollected: false,
+    allowCollected: true,
     allowDownload: true,
     extern: {
       comicPy,
@@ -944,7 +2314,7 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
     },
   };
 
-  console.log(data);
+  // console.log(data);
 
   return {
     source: PLUGIN_ID,
@@ -1090,43 +2460,15 @@ async function fetchImageBytes({ url = '', timeoutMs = 30000 }: FetchImagePayloa
   }
 
   const requestHeaders = await getDefaultHeaders();
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
   const resolvedTimeout = Math.max(0, Number(timeoutMs) || 30000);
-  const timer = controller
-    ? setTimeout(() => {
-        controller.abort();
-      }, resolvedTimeout)
-    : undefined;
-
-  let response: Response;
-  try {
-    response = await wretch(targetUrl)
-      .headers({
-        ...requestHeaders,
-        Referer: 'https://www.zaimanhua.com/',
-        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-      })
-      .options({
-        signal: controller?.signal,
-      })
-      .get()
-      .res();
-  } finally {
-    if (timer) {
-      clearTimeout(timer);
-    }
-  }
-
-  if (!response.ok) {
-    throw new Error(`图片请求失败(${response.status})`);
-  }
-
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength === 0) {
-    throw new Error('图片数据为空');
-  }
-
-  return bytes;
+  return zmhApi.fetchBytes(targetUrl, {
+    headers: {
+      ...requestHeaders,
+      Referer: 'https://www.zaimanhua.com/',
+      Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    },
+    timeoutMs: resolvedTimeout,
+  });
 }
 
 async function getSettingsBundle(): Promise<SettingsBundleContract> {
@@ -1172,7 +2514,7 @@ async function init() {
   if (!zmhInitStarted) {
     zmhInitStarted = true;
     try {
-      const [account, password] = await Promise.all([loadAuthAccount(), loadAuthPassword()]);
+      const { account, password } = await loadLoginCredentials();
       if (account && String(password).trim()) {
         await loginWithPassword({
           account,
@@ -1187,6 +2529,10 @@ async function init() {
     } catch (error) {
       console.warn('[zmh.init] login failed', error);
     }
+  }
+
+  if (await loadAuthToken()) {
+    schedulePostLoginTasks('init');
   }
 
   return {
@@ -1214,14 +2560,25 @@ export async function getCapabilitiesBundle(): Promise<CapabilitiesBundleContrac
 export default {
   init,
   getInfo,
+  getFunctionPage,
   loginWithPassword,
   setAccountAndLogin,
   setPasswordAndLogin,
   searchComic,
+  getUpdatesData,
+  getCategoriesData,
+  getCategoryFilterBundle,
+  getRankingData,
+  getRankingFilterBundle,
+  getSubscriptionsData,
+  getCommentFeed,
   getComicDetail,
   getChapter,
   getReadSnapshot,
   fetchImageBytes,
   getSettingsBundle,
   getCapabilitiesBundle,
+  startFavoriteAction,
+  continueFavoriteAction,
+  toggleFavorite,
 };

@@ -1,6 +1,6 @@
 {
   "name": "breeze-plugin-zai-man-hua",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "type": "module",
   "packageManager": "pnpm@10.27.0",
   "files": [
