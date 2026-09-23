@@ -2207,26 +2207,30 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
   const chapterGroups = (
     Array.isArray(detail.chapters) ? detail.chapters : []
   ) as DetailApiChapterGroup[];
-  let orderCount = 1;
+  let sortCount = 1;
+
   const eps = chapterGroups
     .flatMap((group, groupIndex) => {
       const groupTitle = String(group.title ?? '').trim() || `分组${groupIndex + 1}`;
       const chapters = Array.isArray(group.data) ? group.data : [];
+
       return chapters
         .map((item, chapterIndex) => {
           const id = String(item.chapter_id ?? '').trim();
           if (!id) return null;
-          const order = toNumber(orderCount++, chapterIndex + 1);
+
+          const sort = toNumber(sortCount++, chapterIndex + 1);
           const chapterTitle = String(item.chapter_title ?? '').trim() || `第${chapterIndex + 1}话`;
+
           return {
             id,
             requestId: id,
             logicalKey: id,
             storageChapterId: id,
             name: `${groupTitle}—${chapterTitle}`,
-            order,
+            order: sort,
             extern: {
-              sort: order,
+              sort,
               groupTitle,
               isFee: Boolean(item.is_fee),
               canRead: item.canRead !== false,
@@ -2236,7 +2240,10 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
         })
         .filter((item): item is NonNullable<typeof item> => item !== null);
     })
-    .reverse();
+    .map((item, index, items) => ({
+      ...item,
+      order: items.length - index,
+    }));
   const title = String(detail.title ?? '').trim() || `漫画 #${comicId}`;
   const coverUrl = String(detail.cover ?? '').trim();
   const comicPy = String(detail.comic_py ?? '').trim();
