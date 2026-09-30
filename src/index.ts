@@ -2,6 +2,7 @@ import type {
   CapabilitiesBundleContract,
   ChapterContentContract,
   ComicDetailContract,
+  ComicInfoPageAction,
   ComicPagedListContract,
   CommentFeedContract,
   CommentFeedPayload,
@@ -893,7 +894,7 @@ function createDetailMetadataActionList(
   type: string,
   name: string,
   tags: DetailApiTag[],
-  createOnTap: (tagName: string, tag: DetailApiTag) => Record<string, unknown>
+  createOnTap: (tagName: string, tag: DetailApiTag) => ComicInfoPageAction
 ): MetadataListItem | null {
   const value = tags
     .map((tag) => {
@@ -905,7 +906,7 @@ function createDetailMetadataActionList(
   return value.length ? { type, name, value } : null;
 }
 
-function createCategoryMetadataAction(tagName: string, tag: DetailApiTag) {
+function createCategoryMetadataAction(tagName: string, tag: DetailApiTag): ComicInfoPageAction {
   const tagId = toNumber(tag.tag_id, 0);
   if (!tagId) {
     return {
@@ -945,7 +946,7 @@ function createCategoryMetadataAction(tagName: string, tag: DetailApiTag) {
   };
 }
 
-function createAuthorMetadataAction(tagName: string) {
+function createAuthorMetadataAction(tagName: string): ComicInfoPageAction {
   return {
     type: 'openSearch',
     payload: {
@@ -2269,7 +2270,7 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
           path: '',
           extern: {},
         }),
-        onTap: {},
+        onTap: null,
         extern: {},
       },
       description: String(detail.description ?? ''),

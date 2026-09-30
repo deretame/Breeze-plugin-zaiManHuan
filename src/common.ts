@@ -1,5 +1,6 @@
 import type {
   ActionItem,
+  ComicInfoPageAction,
   ComicListItem,
   ImageItem,
   MetadataListItem,
@@ -20,13 +21,13 @@ export function toStringMap(value: unknown): Record<string, unknown> {
 
 export function createActionItem(
   name: unknown,
-  onTap: Record<string, unknown> = {},
+  onTap: ComicInfoPageAction | null = null,
   extern: Record<string, unknown> = {}
 ): ActionItem {
   return {
     name: String(name ?? ''),
-    onTap: onTap as StringMap,
-    extern: extern as StringMap,
+    onTap: onTap,
+    extern: extern,
   };
 }
 

@@ -2,7 +2,7 @@
   "name": "breeze-plugin-zai-man-hua",
   "version": "0.0.6",
   "type": "module",
-  "packageManager": "pnpm@10.27.0",
+  "packageManager": "pnpm@12.5.0",
   "files": [
     "dist"
   ],
@@ -27,7 +27,7 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "breeze-plugin-kit": "^0.3.0",
+    "breeze-plugin-kit": "^0.12.0",
     "wretch": "^3.0.8"
   }
 }
