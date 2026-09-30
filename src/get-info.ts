@@ -51,7 +51,7 @@ export function buildPluginInfo() {
       describe: '',
     },
     describe: '再漫画插件',
-    version: '0.0.6',
+    version: '0.0.7',
     home: 'https://github.com/deretame/Breeze-plugin-zaiManHuan',
     updateUrl: 'https://api.github.com/repos/deretame/Breeze-plugin-zaiManHuan/releases/latest',
     npmName: 'breeze-plugin-zai-man-hua',
