@@ -6,14 +6,14 @@ import type {
   MetadataListItem,
   PagingInfo,
   StringMap,
-} from 'breeze-plugin-kit';
+} from "breeze-plugin-kit";
 
-export const PLUGIN_ID = '65c18db5-eb13-40d0-9ab4-31f473536aa1';
-export const NOT_FOUND_IMAGE_URL = '';
-export const PLACEHOLDER_IMAGE_PATH = 'placeholder/image-404.png';
+export const PLUGIN_ID = "65c18db5-eb13-40d0-9ab4-31f473536aa1";
+export const NOT_FOUND_IMAGE_URL = "";
+export const PLACEHOLDER_IMAGE_PATH = "placeholder/image-404.png";
 
 export function toStringMap(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
   return value as Record<string, unknown>;
@@ -22,10 +22,10 @@ export function toStringMap(value: unknown): Record<string, unknown> {
 export function createActionItem(
   name: unknown,
   onTap: ComicInfoPageAction | null = null,
-  extern: Record<string, unknown> = {}
+  extern: Record<string, unknown> = {},
 ): ActionItem {
   return {
-    name: String(name ?? ''),
+    name: String(name ?? ""),
     onTap: onTap,
     extern: extern,
   };
@@ -38,13 +38,13 @@ export function createImage(
     name?: unknown;
     path?: unknown;
     extern?: Record<string, unknown>;
-  } = {}
+  } = {},
 ): ImageItem {
   return {
-    id: String(input.id ?? ''),
-    url: String(input.url ?? '').trim() || NOT_FOUND_IMAGE_URL,
-    name: String(input.name ?? ''),
-    path: String(input.path ?? '').trim() || PLACEHOLDER_IMAGE_PATH,
+    id: String(input.id ?? ""),
+    url: String(input.url ?? "").trim() || NOT_FOUND_IMAGE_URL,
+    name: String(input.name ?? ""),
+    path: String(input.path ?? "").trim() || PLACEHOLDER_IMAGE_PATH,
     extern: (input.extern ?? {}) as StringMap,
   };
 }
@@ -53,11 +53,11 @@ export function createMetadataActionList(
   type: string,
   name: string,
   values: unknown,
-  mapItem?: (value: string) => ActionItem
+  mapItem?: (value: string) => ActionItem,
 ): MetadataListItem | null {
   const list = Array.isArray(values) ? values : values == null ? [] : [values];
   const normalized = list
-    .map((item) => String(item ?? '').trim())
+    .map((item) => String(item ?? "").trim())
     .filter((item) => item.length > 0)
     .map((item) => (mapItem ? mapItem(item) : createActionItem(item)));
 
@@ -78,7 +78,7 @@ export function createBasicMetadata(type: string, name: string, values: unknown)
     type,
     name,
     value: list
-      .map((item) => String(item ?? '').trim())
+      .map((item) => String(item ?? "").trim())
       .filter(Boolean)
       .map((item) => createActionItem(item)),
   };
@@ -90,39 +90,39 @@ export function createComicItem(id: string, title: string): ComicListItem {
     source: PLUGIN_ID,
     id,
     title,
-    subtitle: '这是一个占位漫画条目',
+    subtitle: "这是一个占位漫画条目",
     finished: false,
     likesCount: 0,
     viewsCount: 0,
-    updatedAt: '2026-01-01 00:00',
+    updatedAt: "2026-01-01 00:00",
     cover: {
       id,
       url: NOT_FOUND_IMAGE_URL,
       path,
-      name: '',
+      name: "",
       extern: { path },
     },
     metadata: [
-      createBasicMetadata('author', '作者', ['example-author']),
-      createBasicMetadata('categories', '分类', []),
-      createBasicMetadata('tags', '标签', ['example', 'placeholder']),
-      createBasicMetadata('works', '作品', []),
-      createBasicMetadata('actors', '角色', []),
+      createBasicMetadata("author", "作者", ["example-author"]),
+      createBasicMetadata("categories", "分类", []),
+      createBasicMetadata("tags", "标签", ["example", "placeholder"]),
+      createBasicMetadata("works", "作品", []),
+      createBasicMetadata("actors", "角色", []),
     ].filter((item): item is MetadataListItem => item != null),
     raw: {
       id,
       name: title,
-      author: 'example-author',
-      description: 'placeholder',
+      author: "example-author",
+      description: "placeholder",
       image: NOT_FOUND_IMAGE_URL,
-      category: { id: '', title: '' },
+      category: { id: "", title: "" },
       category_sub: { id: null, title: null },
       liked: false,
       is_favorite: false,
       update_at: 0,
       likes: 0,
       totalViews: 0,
-      tags: ['example', 'placeholder'],
+      tags: ["example", "placeholder"],
       works: [],
       actors: [],
       related_list: [],

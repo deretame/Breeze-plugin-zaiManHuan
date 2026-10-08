@@ -1,4 +1,4 @@
-import wretch from 'wretch';
+import wretch from "wretch";
 
 export type ApiResponse<T> = {
   errno: number;
@@ -17,7 +17,7 @@ type HeaderOptions = {
   token?: string;
 };
 
-type RequestMethod = 'GET' | 'POST';
+type RequestMethod = "GET" | "POST";
 
 type AccountRequestOptions = {
   method?: RequestMethod;
@@ -35,15 +35,15 @@ type ApiClientContext = {
   isAuthError: (errno: unknown, errmsg: unknown) => boolean;
 };
 
-const API_BASE = 'https://v4api.zaimanhua.com/app/v1';
-const ACCOUNT_API_BASE = 'https://account-api.zaimanhua.com/v1';
-export const APP_VERSION = '2.3.7';
-export const APP_BUILD_NUMBER = '1502277';
-export const APP_CHANNEL = '101_01_01_000';
+const API_BASE = "https://v4api.zaimanhua.com/app/v1";
+const ACCOUNT_API_BASE = "https://account-api.zaimanhua.com/v1";
+export const APP_VERSION = "2.3.7";
+export const APP_BUILD_NUMBER = "1502277";
+export const APP_CHANNEL = "101_01_01_000";
 
 function getDefaultParams() {
   return {
-    platform: 'android',
+    platform: "android",
     timestamp: String(Math.floor(Date.now() / 1000)),
     _v: APP_VERSION,
     _c: APP_CHANNEL,
@@ -53,7 +53,7 @@ function getDefaultParams() {
 export function createApiClient(context: ApiClientContext) {
   function buildApiUrl(
     path: string,
-    businessParams: Record<string, string | number | undefined> = {}
+    businessParams: Record<string, string | number | undefined> = {},
   ) {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries({ ...getDefaultParams(), ...businessParams })) {
@@ -76,12 +76,12 @@ export function createApiClient(context: ApiClientContext) {
       method?: RequestMethod;
       body?: string;
       errorPrefix: string;
-    }
+    },
   ) {
     const request = wretch(url).headers(options.headers);
     const response =
-      options.method === 'POST'
-        ? await request.post(options.body ?? '').res()
+      options.method === "POST"
+        ? await request.post(options.body ?? "").res()
         : await request.get().res();
     if (!response.ok) {
       throw new Error(`${options.errorPrefix}(${response.status})`);
@@ -93,13 +93,13 @@ export function createApiClient(context: ApiClientContext) {
     const headers = await context.getDefaultHeaders();
     return requestJson<T>(url, {
       headers,
-      errorPrefix: '请求失败',
+      errorPrefix: "请求失败",
     });
   }
 
   async function fetchApiResponse<T>(
     path: string,
-    businessParams: Record<string, string | number | undefined> = {}
+    businessParams: Record<string, string | number | undefined> = {},
   ) {
     return fetchJsonOrThrow<ApiResponse<T>>(buildApiUrl(path, businessParams));
   }
@@ -107,7 +107,7 @@ export function createApiClient(context: ApiClientContext) {
   async function fetchAuthenticatedApiResponse<T>(
     path: string,
     businessParams: Record<string, string | number | undefined> = {},
-    reason = 'api.request'
+    reason = "api.request",
   ) {
     await context.ensureAuthenticated(reason);
     let response = await fetchApiResponse<T>(path, businessParams);
@@ -128,16 +128,16 @@ export function createApiClient(context: ApiClientContext) {
       includeAuth,
       token,
     });
-    headers.Platform = 'android';
+    headers.Platform = "android";
     if (options.contentType) {
-      headers['Content-Type'] = options.contentType;
+      headers["Content-Type"] = options.contentType;
     }
 
     const json = await requestJson<AccountApiResponse<T>>(buildAccountApiUrl(path), {
       headers,
       method: options.method,
       body: options.body,
-      errorPrefix: options.errorPrefix ?? '账号接口请求失败',
+      errorPrefix: options.errorPrefix ?? "账号接口请求失败",
     });
     const errno = Number(json.errno);
     if (
@@ -152,10 +152,10 @@ export function createApiClient(context: ApiClientContext) {
     return json;
   }
 
-  async function fetchAccountApi<T>(path: string, method: RequestMethod = 'GET') {
+  async function fetchAccountApi<T>(path: string, method: RequestMethod = "GET") {
     return requestAccountApi<T>(path, {
       method,
-      contentType: 'application/x-www-form-urlencoded',
+      contentType: "application/x-www-form-urlencoded",
     });
   }
 
@@ -164,9 +164,9 @@ export function createApiClient(context: ApiClientContext) {
     options: {
       headers?: Record<string, string>;
       timeoutMs?: number;
-    } = {}
+    } = {},
   ) {
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
     const resolvedTimeout = Math.max(0, Number(options.timeoutMs) || 30000);
     const timer = controller
       ? setTimeout(() => {
@@ -195,7 +195,7 @@ export function createApiClient(context: ApiClientContext) {
 
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength === 0) {
-      throw new Error('图片数据为空');
+      throw new Error("图片数据为空");
     }
     return bytes;
   }
