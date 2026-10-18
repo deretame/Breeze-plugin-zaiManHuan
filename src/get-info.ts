@@ -58,7 +58,7 @@ export function buildPluginInfo(): ZmhPluginInfo {
     iconUrl:
       "https://raw.githubusercontent.com/deretame/Breeze-plugin-zaiManHuan/refs/heads/main/assets/FS.webp",
     describe: "再漫画插件",
-    version: "0.0.9",
+    version: "0.0.10",
     home: "https://github.com/deretame/Breeze-plugin-zaiManHuan",
     updateUrl: "https://api.github.com/repos/deretame/Breeze-plugin-zaiManHuan/releases/latest",
     npmName: "breeze-plugin-zai-man-hua",

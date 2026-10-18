@@ -2266,37 +2266,47 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
   ) as DetailApiChapterGroup[];
   let sortCount = 1;
 
-  const eps = chapterGroups.flatMap((group, groupIndex) => {
-    const groupTitle = String(group.title ?? "").trim() || `分组${groupIndex + 1}`;
-    const chapters = Array.isArray(group.data) ? group.data : [];
+  // 章节接口返回的顺序是从新到旧：合并前先反转分组顺序，合并后再整体反转 order，
+  // 这样分组保持接口原有前后关系，每组内从旧到新，第一章排在最前面。
+  const totalGroups = chapterGroups.length;
+  const eps = [...chapterGroups]
+    .reverse()
+    .flatMap((group, reversedIndex) => {
+      const groupIndex = totalGroups - 1 - reversedIndex;
+      const groupTitle = String(group.title ?? "").trim() || `分组${groupIndex + 1}`;
+      const chapters = Array.isArray(group.data) ? group.data : [];
 
-    return chapters
-      .map((item, chapterIndex) => {
-        const id = String(item.chapter_id ?? "").trim();
-        if (!id) return null;
+      return chapters
+        .map((item, chapterIndex) => {
+          const id = String(item.chapter_id ?? "").trim();
+          if (!id) return null;
 
-        const sort = sortCount++;
-        const chapterTitle = String(item.chapter_title ?? "").trim() || `第${chapterIndex + 1}话`;
+          const sort = sortCount++;
+          const chapterTitle = String(item.chapter_title ?? "").trim() || `第${chapterIndex + 1}话`;
 
-        return {
-          id,
-          requestId: id,
-          logicalKey: id,
-          storageChapterId: id,
-          name: chapterTitle,
-          order: sort,
-          groupTitle,
-          extern: {
-            sort,
+          return {
+            id,
+            requestId: id,
+            logicalKey: id,
+            storageChapterId: id,
+            name: chapterTitle,
+            order: sort,
             groupTitle,
-            isFee: Boolean(item.is_fee),
-            canRead: item.canRead !== false,
-            updatetime: toNumber(item.updatetime, 0),
-          },
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null);
-  });
+            extern: {
+              sort,
+              groupTitle,
+              isFee: Boolean(item.is_fee),
+              canRead: item.canRead !== false,
+              updatetime: toNumber(item.updatetime, 0),
+            },
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
+    })
+    .map((item, index, items) => ({
+      ...item,
+      order: items.length - index,
+    }));
   const title = String(detail.title ?? "").trim() || `漫画 #${comicId}`;
   const coverUrl = String(detail.cover ?? "").trim();
   const comicPy = String(detail.comic_py ?? "").trim();
