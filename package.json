@@ -1,6 +1,6 @@
 {
   "name": "breeze-plugin-zai-man-hua",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "files": [
     "dist"
   ],
@@ -16,7 +16,7 @@
     "dev:serve": "tsx dev-server.ts"
   },
   "dependencies": {
-    "breeze-plugin-kit": "^0.14.0",
+    "breeze-plugin-kit": "^0.16.0",
     "wretch": "^3.0.8"
   },
   "devDependencies": {

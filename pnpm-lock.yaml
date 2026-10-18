@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       breeze-plugin-kit:
-        specifier: ^0.14.0
-        version: 0.14.0
+        specifier: ^0.16.0
+        version: 0.16.0
       wretch:
         specifier: ^3.0.8
         version: 3.0.9
@@ -974,8 +974,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  breeze-plugin-kit@0.14.0:
-    resolution: {integrity: sha512-fEbx4W8y6jw3XsIUYaCqNcAUZRPdqlxMV7B8/G8B1vHSATwLIVKOp2YWQB2qGgd0xcVMzpxacEqu136AjFwEZw==}
+  breeze-plugin-kit@0.16.0:
+    resolution: {integrity: sha512-lEZZ28zIQdNZk03cDXb2/cwwja6P+cvYn1sNQMxGulnslexbevuHDDTtHQ/Mg+2tTmEe3JRQRhJYDr+x5JqyvA==}
 
   cross-env@10.1.0:
     resolution: {integrity: sha512-GsYosgnACZTADcmEyJctkJIoqAhHjttw7RsFrVoJNXbsWWqaq6Ym+7kZjq6mS45O0jij6vtiReppKQEtqWy6Dw==}
@@ -1488,7 +1488,7 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  breeze-plugin-kit@0.14.0: {}
+  breeze-plugin-kit@0.16.0: {}
 
   cross-env@10.1.0:
     dependencies:

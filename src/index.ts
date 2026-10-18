@@ -16,8 +16,6 @@ import type {
   ReadSnapshotContract,
   SearchResultContract,
   SettingsBundleContract,
-  ToggleFavoritePayload,
-  ToggleFavoriteResult,
 } from "breeze-plugin-kit";
 import {
   buildLoginBundle,
@@ -669,7 +667,10 @@ function readSettingPayloadValue(payload: Record<string, unknown>, key: string) 
  */
 function compareVersions(a: string, b: string): number {
   // dart.getAppVersion 返回 JSON 编码串（首尾带引号），先剥掉。
-  const clean = (v: string) => String(v ?? "").trim().replace(/^"+|"+$/g, "");
+  const clean = (v: string) =>
+    String(v ?? "")
+      .trim()
+      .replace(/^"+|"+$/g, "");
   const pa = clean(a)
     .split(".")
     .map((x) => Number(x) || 0);
@@ -2115,33 +2116,12 @@ async function continueFavoriteAction(
   };
 }
 
-async function toggleFavorite(payload: ToggleFavoritePayload = {}): Promise<ToggleFavoriteResult> {
-  const comicId = String(payload.comicId ?? "").trim();
-  if (!comicId) {
-    throw new Error("comicId 不能为空");
-  }
-
-  const current = await checkSubscribeStatus(comicId);
-  const result = await startFavoriteAction({
-    comicId,
-    action: current ? "removeAll" : "add",
-    currentFavorite: payload.currentFavorite,
-    extern: payload.extern,
-  });
-  if (result.status !== "completed") {
-    throw new Error(result.message || "追更操作失败");
-  }
-  return {
-    favorited: Boolean(result.favorited),
-    nextStep: "none",
-  };
-}
-
 function pickChapterFromEps(
   eps: Array<{
     id: string;
     name: string;
     order: number;
+    groupTitle: string | null;
     extern: Record<string, unknown>;
   }>,
   payload: ReadSnapshotPayload,
@@ -2286,41 +2266,37 @@ async function getComicDetail(payload: ComicDetailPayload = {}): Promise<ComicDe
   ) as DetailApiChapterGroup[];
   let sortCount = 1;
 
-  const eps = chapterGroups
-    .flatMap((group, groupIndex) => {
-      const groupTitle = String(group.title ?? "").trim() || `分组${groupIndex + 1}`;
-      const chapters = Array.isArray(group.data) ? group.data : [];
+  const eps = chapterGroups.flatMap((group, groupIndex) => {
+    const groupTitle = String(group.title ?? "").trim() || `分组${groupIndex + 1}`;
+    const chapters = Array.isArray(group.data) ? group.data : [];
 
-      return chapters
-        .map((item, chapterIndex) => {
-          const id = String(item.chapter_id ?? "").trim();
-          if (!id) return null;
+    return chapters
+      .map((item, chapterIndex) => {
+        const id = String(item.chapter_id ?? "").trim();
+        if (!id) return null;
 
-          const sort = toNumber(sortCount++, chapterIndex + 1);
-          const chapterTitle = String(item.chapter_title ?? "").trim() || `第${chapterIndex + 1}话`;
+        const sort = sortCount++;
+        const chapterTitle = String(item.chapter_title ?? "").trim() || `第${chapterIndex + 1}话`;
 
-          return {
-            id,
-            requestId: id,
-            logicalKey: id,
-            storageChapterId: id,
-            name: `${groupTitle}—${chapterTitle}`,
-            order: sort,
-            extern: {
-              sort,
-              groupTitle,
-              isFee: Boolean(item.is_fee),
-              canRead: item.canRead !== false,
-              updatetime: toNumber(item.updatetime, 0),
-            },
-          };
-        })
-        .filter((item): item is NonNullable<typeof item> => item !== null);
-    })
-    .map((item, index, items) => ({
-      ...item,
-      order: items.length - index,
-    }));
+        return {
+          id,
+          requestId: id,
+          logicalKey: id,
+          storageChapterId: id,
+          name: chapterTitle,
+          order: sort,
+          groupTitle,
+          extern: {
+            sort,
+            groupTitle,
+            isFee: Boolean(item.is_fee),
+            canRead: item.canRead !== false,
+            updatetime: toNumber(item.updatetime, 0),
+          },
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  });
   const title = String(detail.title ?? "").trim() || `漫画 #${comicId}`;
   const coverUrl = String(detail.cover ?? "").trim();
   const comicPy = String(detail.comic_py ?? "").trim();
@@ -2423,6 +2399,23 @@ async function getChapter(payload: ChapterPayload = {}): Promise<ChapterContentC
 
   const chapterData = await getChapterData(comicId, chapterId);
   const currentChapterId = String(chapterData.chapterId ?? chapterId).trim();
+  let groupTitle: string | null = null;
+  let order = chapterData.chapterOrder;
+  try {
+    const detail = await getComicDetail({ comicId, extern: payload.extern });
+    const normal = toStringMap(toStringMap(detail.data).normal);
+    const eps = Array.isArray(normal.eps) ? normal.eps : [];
+    const matched = eps
+      .map((item) => toStringMap(item))
+      .find((item) => String(item.id ?? "").trim() === currentChapterId);
+    if (matched) {
+      const title = String(matched.groupTitle ?? "").trim();
+      groupTitle = title || null;
+      order = toNumber(matched.order, order);
+    }
+  } catch {
+    // 详情解析失败时沿用章节接口返回的顺序，不阻断下载
+  }
   const docs = chapterData.imageUrls.map((imageUrl, index) => {
     const name = extractImageName(imageUrl, index);
     const path = `comic/${comicId}/${currentChapterId}/${name}`;
@@ -2456,11 +2449,12 @@ async function getChapter(payload: ChapterPayload = {}): Promise<ChapterContentC
       },
       chapter: {
         id: currentChapterId,
-        requestId: "",
-        logicalKey: "",
-        storageChapterId: "",
+        requestId: currentChapterId,
+        logicalKey: currentChapterId,
+        storageChapterId: currentChapterId,
         name: chapterData.chapterName || `章节 ${currentChapterId}`,
-        order: chapterData.chapterOrder,
+        order,
+        groupTitle,
         pages: docs,
         extern: {},
       },
@@ -2480,12 +2474,16 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}): Promise<ReadS
   const comicInfo = toStringMap(normal.comicInfo);
   const eps = (Array.isArray(normal.eps) ? normal.eps : [])
     .map((item) => toStringMap(item))
-    .map((item) => ({
-      id: String(item.id ?? "").trim(),
-      name: String(item.name ?? "").trim(),
-      order: toNumber(item.order, 0),
-      extern: toStringMap(item.extern),
-    }))
+    .map((item) => {
+      const groupTitle = String(item.groupTitle ?? "").trim();
+      return {
+        id: String(item.id ?? "").trim(),
+        name: String(item.name ?? "").trim(),
+        order: toNumber(item.order, 0),
+        groupTitle: groupTitle || null,
+        extern: toStringMap(item.extern),
+      };
+    })
     .filter((item) => item.id);
   const targetChapter = pickChapterFromEps(eps, payload);
   if (!targetChapter) {
@@ -2525,11 +2523,12 @@ async function getReadSnapshot(payload: ReadSnapshotPayload = {}): Promise<ReadS
       },
       chapter: {
         id: chapterData.chapterId,
-        requestId: "",
-        logicalKey: "",
-        storageChapterId: "",
+        requestId: chapterData.chapterId,
+        logicalKey: chapterData.chapterId,
+        storageChapterId: chapterData.chapterId,
         name: chapterData.chapterName || targetChapter.name,
         order: chapterData.chapterOrder || targetChapter.order,
+        groupTitle: targetChapter.groupTitle,
         pages,
         extern: { source: "v4api" },
       },
@@ -2671,5 +2670,4 @@ export default {
   getCapabilitiesBundle,
   startFavoriteAction,
   continueFavoriteAction,
-  toggleFavorite,
 };
