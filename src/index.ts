@@ -348,6 +348,7 @@ const CLIENT_ID_CONFIG_KEY = "network.clientId";
 const AUTH_ACCOUNT_CONFIG_KEY = "auth.account";
 const AUTH_PASSWORD_CONFIG_KEY = "auth.password";
 const AUTH_TOKEN_CONFIG_KEY = "auth.token";
+const SIGN_IN_NOTIFIED_DAY_CONFIG_KEY = "signIn.lastNotifiedDay";
 const AUTH_CREDENTIALS_REQUIRED_ERROR =
   "[AUTH_CREDENTIALS_REQUIRED] 账号或密码不能为空，请前往插件登录页填写";
 const AUTH_PERMISSION_INSUFFICIENT_ERROR =
@@ -1695,9 +1696,23 @@ function buildTitleMeta(input: { statusText: string; updateText: string; chapter
     createActionItem(`章节数：${input.chapterCount}`),
   ];
 }
-
 function delay(milliseconds: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function getTodayDayString() {
+  try {
+    const now = Temporal.Now.plainDateTimeISO().toPlainDate().toString();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(now)) {
+      return now;
+    }
+  } catch {
+    // 旧宿主或测试环境无 Temporal，回退到本地日期。
+  }
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 async function getTodaySignInStatus() {
@@ -1734,18 +1749,24 @@ async function runAutoSignInUntilSuccess() {
   const task = (async () => {
     while (true) {
       try {
-        const signedIn = await getTodaySignInStatus();
-        if (signedIn) {
-          await notifyAutoSignInSuccess();
+        const today = getTodayDayString();
+        if (
+          (await loadAndNormalizeConfigString(SIGN_IN_NOTIFIED_DAY_CONFIG_KEY, "")).trim() === today
+        ) {
+          console.info("[zmh.signIn] already notified today");
           return;
         }
-
+        if (await getTodaySignInStatus()) {
+          await notifyAutoSignInSuccess();
+          await saveConfigString(SIGN_IN_NOTIFIED_DAY_CONFIG_KEY, today);
+          return;
+        }
         await executeSignInTask();
-        const confirmed = await getTodaySignInStatus();
-        if (!confirmed) {
+        if (!(await getTodaySignInStatus())) {
           throw new Error("签到请求成功但服务端状态未确认");
         }
         await notifyAutoSignInSuccess();
+        await saveConfigString(SIGN_IN_NOTIFIED_DAY_CONFIG_KEY, today);
         console.info("[zmh.signIn] automatic sign-in success");
         return;
       } catch (error) {
