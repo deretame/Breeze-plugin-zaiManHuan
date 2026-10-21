@@ -10,12 +10,18 @@ import type {
   FilterBundleContract,
   FunctionPageActionGridItem,
   FunctionPageContract,
+  GetPluginCloudFavoritePagesBundlePayload,
+  GetPluginHomePagesBundlePayload,
   LoginBundleContract,
   LoginSubmitResult,
   MetadataListItem,
+  PluginCloudFavoritePagesBundleContract,
+  PluginHomePagesBundleContract,
+  PluginHomeTab,
   ReadSnapshotContract,
   SearchResultContract,
   SettingsBundleContract,
+  PluginInfo,
 } from "breeze-plugin-kit";
 import {
   buildLoginBundle,
@@ -40,7 +46,12 @@ import {
   createImage,
   toStringMap,
 } from "./common";
-import { buildPluginInfo, type ZmhPluginInfo } from "./get-info";
+import {
+  buildPluginInfo,
+  buildRankingScene,
+  buildSubscriptionsScene,
+  buildUpdatesScene,
+} from "./get-info";
 
 type BasePayload = {
   extern?: Record<string, unknown>;
@@ -2244,7 +2255,7 @@ async function getChapterData(comicId: string, chapterId: string, retryAfterLogi
   };
 }
 
-async function getInfo(): Promise<ZmhPluginInfo> {
+async function getInfo(): Promise<PluginInfo> {
   return buildPluginInfo();
 }
 async function searchComic(payload: SearchPayload = {}): Promise<SearchResultContract> {
@@ -2630,29 +2641,35 @@ async function getSettingsBundle(): Promise<SettingsBundleContract> {
   };
 }
 
+async function loginForInit(): Promise<void> {
+  const { account, password } = await loadLoginCredentials();
+  if (!account || !String(password).trim()) {
+    console.info("[zmh.init] skip login: no credentials");
+    return;
+  }
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await loginWithPassword({ account, password, reason: "init", persistCredentials: true });
+      console.info(`[zmh.init] login success (attempt ${attempt})`);
+      // 签到不阻塞 init，后台跑一次即可（schedulePostLoginTasks 内去重常驻）。
+      schedulePostLoginTasks("init");
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn(`[zmh.init] login failed (attempt ${attempt}/3)`, error);
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`登录失败，已重试 3 次: ${String(lastError)}`);
+}
+
 async function init() {
   if (!zmhInitStarted) {
     zmhInitStarted = true;
-    try {
-      const { account, password } = await loadLoginCredentials();
-      if (account && String(password).trim()) {
-        await loginWithPassword({
-          account,
-          password,
-          reason: "init",
-          persistCredentials: true,
-        });
-        console.info("[zmh.init] login success");
-      } else {
-        console.info("[zmh.init] skip login: no credentials");
-      }
-    } catch (error) {
-      console.warn("[zmh.init] login failed", error);
-    }
-  }
-
-  if (await loadAuthToken()) {
-    schedulePostLoginTasks("init");
+    // 走完登录（最多 3 次）才算 init 成功；无账号直接返回成功。
+    await loginForInit();
   }
 
   return {
@@ -2662,6 +2679,40 @@ async function init() {
       started: true,
       hasToken: Boolean(await loadAuthToken()),
     },
+  };
+}
+// ---------------------------------------------------------------------------
+// 插件首页 / 云端收藏双 bundle。
+// tabs 复用 get-info 的 scene builder（updates/分类入口/ranking/subscriptions），
+// subscriptions 按 openComicList 入口处理（追更需登录，未登录宿主按登录页处理）。
+// ---------------------------------------------------------------------------
+
+async function getPluginHomePagesBundle(
+  _payload: GetPluginHomePagesBundlePayload = {},
+): Promise<PluginHomePagesBundleContract> {
+  const categories = await getFunctionPage({ id: "categories" });
+  const tabs: PluginHomeTab[] = [
+    { id: "updates", title: "更新", scene: buildUpdatesScene() },
+    { id: "categories", title: "分类", page: categories },
+    { id: "ranking", title: "排行", scene: buildRankingScene() },
+  ];
+  return {
+    source: PLUGIN_ID,
+    scheme: { version: "1.0.0", type: "homePagesBundle" },
+    data: { tabs },
+  };
+}
+
+async function getPluginCloudFavoritePagesBundle(
+  _payload: GetPluginCloudFavoritePagesBundlePayload = {},
+): Promise<PluginCloudFavoritePagesBundleContract> {
+  const tabs: PluginHomeTab[] = [
+    { id: "subscriptions", title: "追更", scene: buildSubscriptionsScene() },
+  ];
+  return {
+    source: PLUGIN_ID,
+    scheme: { version: "1.0.0", type: "cloudFavoritePagesBundle" },
+    data: { tabs },
   };
 }
 
@@ -2699,6 +2750,8 @@ export default {
   fetchImageBytes,
   getSettingsBundle,
   getCapabilitiesBundle,
+  getPluginHomePagesBundle,
+  getPluginCloudFavoritePagesBundle,
   startFavoriteAction,
   continueFavoriteAction,
 };

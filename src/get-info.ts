@@ -1,33 +1,19 @@
+import type { ComicListScene, PluginInfo } from "breeze-plugin-kit";
 import { PLUGIN_ID } from "./common";
 
-export type ZmhPluginInfo = {
-  name: string;
-  uuid: string;
-  iconUrl: string;
-  describe: string;
-  version: string;
-  home: string;
-  updateUrl: string;
-  npmName: string;
-  function: Array<Record<string, unknown>>;
-};
-export function buildPluginInfo(): ZmhPluginInfo {
-  const updatesScene = {
+export function buildUpdatesScene(): ComicListScene {
+  return {
     title: "更新",
     source: PLUGIN_ID,
     body: {
       type: "pluginPagedComicList" as const,
-      request: {
-        fnPath: "getUpdatesData",
-        core: {},
-        extern: {
-          source: "updates",
-        },
-      },
+      request: { fnPath: "getUpdatesData", core: {}, extern: { source: "updates" } },
     },
   };
+}
 
-  const rankingScene = {
+export function buildRankingScene(): ComicListScene {
+  return {
     title: "排行",
     source: PLUGIN_ID,
     body: {
@@ -35,22 +21,28 @@ export function buildPluginInfo(): ZmhPluginInfo {
       request: {
         fnPath: "getRankingData",
         core: {},
-        extern: {
-          source: "ranking",
-          rankingType: "classic",
-          tagId: 0,
-          byTime: 0,
-          rankType: 0,
-        },
+        extern: { source: "ranking", rankingType: "classic", tagId: 0, byTime: 0, rankType: 0 },
       },
     },
-    filter: {
-      fnPath: "getRankingFilterBundle",
-      extern: {
-        source: "ranking",
-      },
+    filter: { fnPath: "getRankingFilterBundle", core: {}, extern: { source: "ranking" } },
+  };
+}
+
+export function buildSubscriptionsScene(): ComicListScene {
+  return {
+    title: "追更",
+    source: PLUGIN_ID,
+    body: {
+      type: "pluginPagedComicList" as const,
+      request: { fnPath: "getSubscriptionsData", core: {}, extern: { source: "subscriptions" } },
     },
   };
+}
+
+export function buildPluginInfo(): PluginInfo {
+  const updatesScene = buildUpdatesScene();
+  const rankingScene = buildRankingScene();
+  const subscriptionsScene = buildSubscriptionsScene();
 
   return {
     name: "再漫画",
@@ -58,10 +50,12 @@ export function buildPluginInfo(): ZmhPluginInfo {
     iconUrl:
       "https://raw.githubusercontent.com/deretame/Breeze-plugin-zaiManHuan/refs/heads/main/assets/FS.webp",
     describe: "再漫画插件",
-    version: "0.0.11",
+    version: "0.1.0",
     home: "https://github.com/deretame/Breeze-plugin-zaiManHuan",
     updateUrl: "https://api.github.com/repos/deretame/Breeze-plugin-zaiManHuan/releases/latest",
     npmName: "breeze-plugin-zai-man-hua",
+    haveHome: true,
+    haveCloudFavorite: true,
     function: [
       {
         id: "updates",
@@ -100,22 +94,7 @@ export function buildPluginInfo(): ZmhPluginInfo {
         title: "追更",
         action: {
           type: "openComicList" as const,
-          payload: {
-            scene: {
-              title: "追更",
-              source: PLUGIN_ID,
-              body: {
-                type: "pluginPagedComicList" as const,
-                request: {
-                  fnPath: "getSubscriptionsData",
-                  core: {},
-                  extern: {
-                    source: "subscriptions",
-                  },
-                },
-              },
-            },
-          },
+          payload: { scene: subscriptionsScene },
         },
       },
     ],
